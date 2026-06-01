@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ClienteConSaldo } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
 import { useUsuario } from '@/hooks/useUsuario';
 import { SelectorCliente } from '@/components/clientes/SelectorCliente';
 import { formatearMoneda } from '@/lib/utils';
@@ -44,6 +45,7 @@ function NuevoFiadoContent() {
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [fiadoCreado, setFiadoCreado] = useState<FiadoCreado | null>(null);
+  const [mostrarModalConfirmar, setMostrarModalConfirmar] = useState(false);
 
   useEffect(() => {
     const clienteId = searchParams.get('cliente');
@@ -375,34 +377,25 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
         <Button
           className="w-full h-14 text-lg"
           disabled={guardando || superaTope || total === 0}
-          onClick={handleConfirmar}
+          onClick={() => setMostrarModalConfirmar(true)}
         >
           {guardando ? 'Registrando...' : 'CONFIRMAR FIADO'}
         </Button>
-      </div>
-    );
-  }
 
-  if (paso === 1) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.back()}
-            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
-        </div>
-
-        <p className="text-sm text-gray-500">Paso 1 de 3 — Selecciona el cliente</p>
-
-        <SelectorCliente
-          onSeleccionar={seleccionarCliente}
-        />
+        <Modal
+          isOpen={mostrarModalConfirmar}
+          onClose={() => setMostrarModalConfirmar(false)}
+          title="Confirmar fiado"
+          confirmText="Sí, confirmar"
+          cancelText="Revisar"
+          onConfirm={handleConfirmar}
+        >
+          <div className="space-y-2">
+            <p><span className="font-medium">Cliente:</span> {clienteSeleccionado?.nombre}</p>
+            <p><span className="font-medium">Total:</span> {formatearMoneda(total)}</p>
+            <p><span className="font-medium">Nuevo saldo:</span> {formatearMoneda(nuevoSaldo)}</p>
+          </div>
+        </Modal>
       </div>
     );
   }
@@ -618,10 +611,25 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
         <Button
           className="w-full h-14 text-lg"
           disabled={guardando || superaTope || total === 0}
-          onClick={handleConfirmar}
+          onClick={() => setMostrarModalConfirmar(true)}
         >
           {guardando ? 'Registrando...' : 'CONFIRMAR FIADO'}
         </Button>
+
+        <Modal
+          isOpen={mostrarModalConfirmar}
+          onClose={() => setMostrarModalConfirmar(false)}
+          title="Confirmar fiado"
+          confirmText="Sí, confirmar"
+          cancelText="Revisar"
+          onConfirm={handleConfirmar}
+        >
+          <div className="space-y-2">
+            <p><span className="font-medium">Cliente:</span> {clienteSeleccionado?.nombre}</p>
+            <p><span className="font-medium">Total:</span> {formatearMoneda(total)}</p>
+            <p><span className="font-medium">Nuevo saldo:</span> {formatearMoneda(nuevoSaldo)}</p>
+          </div>
+        </Modal>
       </div>
     );
   }
