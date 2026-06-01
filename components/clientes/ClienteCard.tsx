@@ -3,11 +3,11 @@
 import { ClienteConSaldo } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { formatearMoneda } from '@/lib/utils';
+import { formatearMoneda, calcularEstadoMora } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface ClienteCardProps {
-  cliente: ClienteConSaldo;
+  cliente: ClienteConSaldo & { dias_sin_movimiento?: number; estado_mora?: 'al_dia' | 'moroso' | 'critico' };
   onClick?: (cliente: ClienteConSaldo) => void;
   mostrarAcciones?: boolean;
 }
@@ -15,6 +15,8 @@ interface ClienteCardProps {
 export function ClienteCard({ cliente, onClick, mostrarAcciones = true }: ClienteCardProps) {
   const tieneSaldo = cliente.saldo > 0;
   const estaBloqueado = cliente.estado === 'bloqueado';
+  const estadoMora = calcularEstadoMora(cliente.saldo, cliente.dias_sin_movimiento || 0);
+  const mostrarDiasMora = tieneSaldo && cliente.dias_sin_movimiento && cliente.dias_sin_movimiento >= 15;
 
   return (
     <Card
@@ -41,13 +43,20 @@ export function ClienteCard({ cliente, onClick, mostrarAcciones = true }: Client
             {cliente.celular.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')}
           </p>
         </div>
-        {estaBloqueado ? (
-          <Badge variant="neutral">BLOQUEADO</Badge>
-        ) : tieneSaldo ? (
-          <Badge variant="danger">{formatearMoneda(cliente.saldo)}</Badge>
-        ) : (
-          <Badge variant="success">Al día</Badge>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          {estaBloqueado ? (
+            <Badge variant="neutral">BLOQUEADO</Badge>
+          ) : tieneSaldo ? (
+            <Badge variant="danger">{formatearMoneda(cliente.saldo)}</Badge>
+          ) : (
+            <Badge variant="success">Al día</Badge>
+          )}
+          {mostrarDiasMora && (
+            <span className={`text-xs font-medium ${estadoMora.color}`}>
+              {estadoMora.emoji} {cliente.dias_sin_movimiento} días
+            </span>
+          )}
+        </div>
       </div>
 
       {mostrarAcciones && (

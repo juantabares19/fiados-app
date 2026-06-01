@@ -22,6 +22,8 @@ export interface Cliente {
 
 export interface ClienteConSaldo extends Cliente {
   saldo: number;
+  dias_sin_movimiento?: number;
+  estado_mora?: 'al_dia' | 'moroso' | 'critico';
 }
 
 export interface Fiado {

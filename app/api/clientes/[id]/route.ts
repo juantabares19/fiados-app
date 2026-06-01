@@ -43,9 +43,54 @@ export async function GET(
       .eq('id', id)
       .single();
 
+    const { data: ultimoFiado } = await supabase
+      .from('fiados')
+      .select('created_at')
+      .eq('cliente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const { data: ultimoAbono } = await supabase
+      .from('abonos')
+      .select('created_at')
+      .eq('cliente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    let diasSinMovimiento = 0;
+    let ultimoMovimiento: string | null = null;
+
+    if (ultimoFiado && ultimoAbono) {
+      ultimoMovimiento = new Date(ultimoFiado.created_at) > new Date(ultimoAbono.created_at)
+        ? ultimoFiado.created_at
+        : ultimoAbono.created_at;
+    } else if (ultimoFiado) {
+      ultimoMovimiento = ultimoFiado.created_at;
+    } else if (ultimoAbono) {
+      ultimoMovimiento = ultimoAbono.created_at;
+    }
+
+    if (ultimoMovimiento) {
+      const fechaMov = new Date(ultimoMovimiento);
+      const hoy = new Date();
+      const diffTime = hoy.getTime() - fechaMov.getTime();
+      diasSinMovimiento = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    const saldo = saldos?.saldo || 0;
+    let estadoMora: 'al_dia' | 'moroso' | 'critico' = 'al_dia';
+    if (saldo > 0) {
+      if (diasSinMovimiento >= 30) estadoMora = 'critico';
+      else if (diasSinMovimiento >= 15) estadoMora = 'moroso';
+    }
+
     return NextResponse.json({
       ...cliente,
-      saldo: saldos?.saldo || 0,
+      saldo,
+      dias_sin_movimiento: diasSinMovimiento,
+      estado_mora: estadoMora,
     });
   } catch (error) {
     console.error('GET /api/clientes/[id] error:', error);

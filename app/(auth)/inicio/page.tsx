@@ -13,6 +13,7 @@ interface ResumenHoy {
   total_abonado_hoy: number;
   cartera_total: number;
   clientes_con_deuda: number;
+  total_morosos: number;
 }
 
 export default function InicioPage() {
@@ -140,6 +141,17 @@ export default function InicioPage() {
                 <div className="text-center">
                   <p className="text-3xl font-bold text-orange-600">{resumen?.clientes_con_deuda || '...'}</p>
                   <p className="text-sm text-gray-500 mt-1">Morosos</p>
+                </div>
+              </Card>
+              <Card
+                className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => window.location.href = '/morosos'}
+              >
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-red-600">
+                    {resumen?.total_morosos || 0}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">En mora</p>
                 </div>
               </Card>
               <Card

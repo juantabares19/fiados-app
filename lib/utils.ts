@@ -46,3 +46,24 @@ export function calcularDiasMora(ultimaFecha: string): number {
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+export interface EstadoMoraResult {
+  estado: 'al_dia' | 'moroso' | 'critico';
+  label: string;
+  color: string;
+  bgColor: string;
+  emoji: string;
+}
+
+export function calcularEstadoMora(saldo: number, diasSinMovimiento: number): EstadoMoraResult {
+  if (saldo === 0) {
+    return { estado: 'al_dia', label: 'Al día', color: 'text-green-600', bgColor: 'bg-green-50', emoji: '🟢' };
+  }
+  if (diasSinMovimiento < 15) {
+    return { estado: 'al_dia', label: 'Al día', color: 'text-green-600', bgColor: 'bg-green-50', emoji: '🟢' };
+  }
+  if (diasSinMovimiento < 30) {
+    return { estado: 'moroso', label: 'Moroso', color: 'text-orange-600', bgColor: 'bg-orange-50', emoji: '🟠' };
+  }
+  return { estado: 'critico', label: 'Crítico', color: 'text-red-600', bgColor: 'bg-red-50', emoji: '🔴' };
+}

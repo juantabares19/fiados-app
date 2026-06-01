@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useUsuario } from '@/hooks/useUsuario';
-import { formatearMoneda, formatearFechaCorta, formatearHora } from '@/lib/utils';
+import { formatearMoneda, formatearFechaCorta, formatearHora, calcularEstadoMora } from '@/lib/utils';
 import Link from 'next/link';
 
 interface DetalleProducto {
@@ -182,6 +182,14 @@ export default function ClientePerfilPage() {
         <p className={`text-4xl font-bold ${tieneSaldo ? 'text-red-600' : 'text-green-600'}`}>
           {formatearMoneda(cliente.saldo)}
         </p>
+        {cliente.estado_mora && cliente.estado_mora !== 'al_dia' && (
+          <Badge className={`mt-2 ${calcularEstadoMora(cliente.saldo, cliente.dias_sin_movimiento || 0).bgColor} ${calcularEstadoMora(cliente.saldo, cliente.dias_sin_movimiento || 0).color}`}>
+            {calcularEstadoMora(cliente.saldo, cliente.dias_sin_movimiento || 0).emoji} {cliente.estado_mora === 'critico' ? 'Crítico' : 'Moroso'} ({(cliente.dias_sin_movimiento || 0)} días)
+          </Badge>
+        )}
+        {cliente.estado_mora === 'al_dia' && !tieneSaldo && (
+          <Badge variant="success" className="mt-2 bg-green-50 text-green-600">🟢 Al día</Badge>
+        )}
         {estaBloqueado && (
           <Badge variant="neutral" className="mt-2">BLOQUEADO</Badge>
         )}
