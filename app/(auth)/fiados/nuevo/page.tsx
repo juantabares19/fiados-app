@@ -1,0 +1,460 @@
+'use client';
+
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ClienteConSaldo } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useUsuario } from '@/hooks/useUsuario';
+import { SelectorCliente } from '@/components/clientes/SelectorCliente';
+import { formatearMoneda } from '@/lib/utils';
+
+interface ProductoForm {
+  producto: string;
+  cantidad: number;
+  valor_unitario: number;
+}
+
+interface FiadoCreado {
+  id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  quien_pidio: string;
+  familiar: string | null;
+  nota: string | null;
+  total: number;
+  created_at: string;
+  detalles: { producto: string; cantidad: number; valor_unitario: number; subtotal: number }[];
+}
+
+function NuevoFiadoContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { usuario } = useUsuario();
+
+  const [paso, setPaso] = useState(1);
+  const [clientePreseleccionadoId, setClientePreseleccionadoId] = useState<string | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteConSaldo | null>(null);
+  const [quienPidio, setQuienPidio] = useState<'cliente' | 'familiar'>('cliente');
+  const [familiar, setFamiliar] = useState('');
+  const [productos, setProductos] = useState<ProductoForm[]>([{ producto: '', cantidad: 1, valor_unitario: 0 }]);
+  const [nota, setNota] = useState('');
+  const [error, setError] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [fiadoCreado, setFiadoCreado] = useState<FiadoCreado | null>(null);
+
+  useEffect(() => {
+    const clienteId = searchParams.get('cliente');
+    if (clienteId) {
+      setClientePreseleccionadoId(clienteId);
+      cargarCliente(clienteId);
+    }
+  }, [searchParams]);
+
+  const cargarCliente = async (id: string) => {
+    try {
+      const response = await fetch(`/api/clientes/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setClienteSeleccionado(data);
+        setPaso(2);
+      }
+    } catch (err) {
+      console.error('Error al cargar cliente:', err);
+    }
+  };
+
+  const seleccionarCliente = (cliente: ClienteConSaldo) => {
+    if (cliente.estado === 'bloqueado') {
+      alert('Este cliente está bloqueado.');
+      return;
+    }
+    if (cliente.saldo >= cliente.tope_credito) {
+      alert('Este cliente ya alcanzó su tope de crédito.');
+      return;
+    }
+    setClienteSeleccionado(cliente);
+    setPaso(2);
+  };
+
+  const agregarProducto = () => {
+    setProductos([...productos, { producto: '', cantidad: 1, valor_unitario: 0 }]);
+  };
+
+  const eliminarProducto = (index: number) => {
+    if (productos.length === 1) return;
+    setProductos(productos.filter((_, i) => i !== index));
+  };
+
+  const actualizarProducto = (index: number, campo: keyof ProductoForm, valor: string | number) => {
+    const nuevos = [...productos];
+    nuevos[index] = { ...nuevos[index], [campo]: valor };
+    setProductos(nuevos);
+  };
+
+  const total = productos.reduce((sum, p) => sum + (p.cantidad * p.valor_unitario), 0);
+  const nuevoSaldo = clienteSeleccionado ? clienteSeleccionado.saldo + total : 0;
+  const disponible = clienteSeleccionado ? clienteSeleccionado.tope_credito - clienteSeleccionado.saldo : 0;
+  const superaTope = nuevoSaldo > (clienteSeleccionado?.tope_credito || 0);
+
+  const handleConfirmar = async () => {
+    setError('');
+
+    const productosValidos = productos.filter(p => p.producto.trim() !== '' && p.cantidad > 0 && p.valor_unitario > 0);
+    if (productosValidos.length === 0) {
+      setError('Agrega al menos un producto');
+      return;
+    }
+
+    if (quienPidio === 'familiar' && !familiar.trim()) {
+      setError('Ingresa el nombre del familiar');
+      return;
+    }
+
+    if (superaTope) {
+      setError('Este fiado supera el tope de crédito disponible');
+      return;
+    }
+
+    setGuardando(true);
+    try {
+      const response = await fetch('/api/fiados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente_id: clienteSeleccionado?.id,
+          quien_pidio: quienPidio,
+          familiar: familiar.trim() || null,
+          nota: nota.trim() || null,
+          productos: productosValidos.map(p => ({
+            producto: p.producto.trim(),
+            cantidad: p.cantidad,
+            valor_unitario: p.valor_unitario,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al crear fiado');
+      }
+
+      setFiadoCreado(data.fiado);
+      setPaso(3);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al registrar fiado');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const reiniciar = () => {
+    setPaso(1);
+    setClienteSeleccionado(null);
+    setQuienPidio('cliente');
+    setFamiliar('');
+    setProductos([{ producto: '', cantidad: 1, valor_unitario: 0 }]);
+    setNota('');
+    setError('');
+    setFiadoCreado(null);
+  };
+
+  if (paso === 1 || clientePreseleccionadoId) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
+        </div>
+
+        <p className="text-sm text-gray-500">Paso 1 de 3 — Selecciona el cliente</p>
+
+        <SelectorCliente
+          onSeleccionar={seleccionarCliente}
+          clientePreseleccionadoId={clientePreseleccionadoId || undefined}
+        />
+      </div>
+    );
+  }
+
+  if (paso === 2 && clienteSeleccionado) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPaso(1)}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
+            <p className="text-sm text-gray-500">Paso 2 de 3</p>
+          </div>
+        </div>
+
+        <Card className="p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-semibold text-gray-900">{clienteSeleccionado.nombre}</p>
+              {clienteSeleccionado.apodo && <p className="text-sm text-gray-500">({clienteSeleccionado.apodo})</p>}
+            </div>
+            <span className={`text-sm font-medium ${clienteSeleccionado.saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              Debe: {formatearMoneda(clienteSeleccionado.saldo)}
+            </span>
+          </div>
+          <div className="mt-2 text-sm text-gray-500">
+            Tope: {formatearMoneda(clienteSeleccionado.tope_credito)} | Disponible:{' '}
+            <span className={disponible > 0 ? 'text-green-600 font-medium' : 'text-red-600'}>
+              {formatearMoneda(disponible)}
+            </span>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h3 className="font-medium text-gray-700 mb-3">¿Quién lo pide?</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setQuienPidio('cliente')}
+              className={`p-3 rounded-xl border-2 transition-colors ${
+                quienPidio === 'cliente'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="text-sm font-medium">Cliente</span>
+            </button>
+            <button
+              onClick={() => setQuienPidio('familiar')}
+              className={`p-3 rounded-xl border-2 transition-colors ${
+                quienPidio === 'familiar'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span className="text-sm font-medium">Familiar</span>
+            </button>
+          </div>
+
+          {quienPidio === 'familiar' && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del familiar</label>
+              <input
+                type="text"
+                placeholder="Carlos (hijo)"
+                value={familiar}
+                onChange={(e) => setFamiliar(e.target.value)}
+                className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4">
+          <h3 className="font-medium text-gray-700 mb-3">PRODUCTOS</h3>
+          <div className="space-y-3">
+            {productos.map((prod, index) => (
+              <div key={index} className="p-3 bg-gray-50 rounded-xl">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm text-gray-500">#{index + 1}</span>
+                  {productos.length > 1 && (
+                    <button
+                      onClick={() => eliminarProducto(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Nombre del producto"
+                  value={prod.producto}
+                  onChange={(e) => actualizarProducto(index, 'producto', e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-200 mb-2 text-base"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500">Cantidad</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={prod.cantidad}
+                      onChange={(e) => actualizarProducto(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Valor unitario</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={prod.valor_unitario || ''}
+                      onChange={(e) => actualizarProducto(index, 'valor_unitario', parseInt(e.target.value) || 0)}
+                      className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
+                      placeholder="$"
+                    />
+                  </div>
+                </div>
+                {prod.cantidad > 0 && prod.valor_unitario > 0 && (
+                  <p className="text-right text-sm text-gray-500 mt-1">
+                    Subtotal: {formatearMoneda(prod.cantidad * prod.valor_unitario)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={agregarProducto}
+            className="w-full mt-3 h-10 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:border-gray-400 flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Agregar producto
+          </button>
+        </Card>
+
+        <Card className="p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Nota (opcional)</label>
+          <input
+            type="text"
+            placeholder="Dijo que paga el viernes..."
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-base"
+          />
+        </Card>
+
+        <Card className="p-4 bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-lg font-semibold">TOTAL:</span>
+            <span className="text-2xl font-bold text-gray-900">{formatearMoneda(total)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Nuevo saldo:</span>
+            <span className={`text-lg font-semibold ${superaTope ? 'text-red-600' : 'text-gray-900'}`}>
+              {formatearMoneda(nuevoSaldo)}
+            </span>
+          </div>
+          {superaTope && (
+            <p className="text-red-600 text-sm mt-2 font-medium">
+              Supera el tope. Disponible: {formatearMoneda(disponible)}
+            </p>
+          )}
+        </Card>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+            <p className="text-red-600 text-sm text-center">{error}</p>
+          </div>
+        )}
+
+        <Button
+          className="w-full h-14 text-lg"
+          disabled={guardando || superaTope || total === 0}
+          onClick={handleConfirmar}
+        >
+          {guardando ? 'Registrando...' : 'CONFIRMAR FIADO'}
+        </Button>
+      </div>
+    );
+  }
+
+  if (paso === 3 && fiadoCreado) {
+    return (
+      <div className="space-y-6 text-center">
+        <div className="pt-8">
+          <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">¡Fiado registrado!</h1>
+        </div>
+
+        <Card className="p-4 text-left">
+          <p className="font-semibold text-lg mb-1">{fiadoCreado.cliente_nombre}</p>
+          {fiadoCreado.quien_pidio === 'familiar' && fiadoCreado.familiar && (
+            <p className="text-sm text-gray-500 mb-3">Pidió: {fiadoCreado.familiar}</p>
+          )}
+
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            {fiadoCreado.detalles.map((d, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span>{d.producto} x{d.cantidad}</span>
+                <span className="font-medium">{formatearMoneda(d.subtotal)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-gray-100 mt-3 pt-3">
+            <div className="flex justify-between font-semibold">
+              <span>Total:</span>
+              <span className="text-xl">{formatearMoneda(fiadoCreado.total)}</span>
+            </div>
+          </div>
+        </Card>
+
+        <Button
+          variant="outline"
+          className="w-full h-12"
+          onClick={() => alert('Disponible próximamente')}
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          Enviar por WhatsApp
+        </Button>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" onClick={reiniciar}>
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Nuevo fiado
+          </Button>
+          <Button onClick={() => router.push('/inicio')}>
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Ir al inicio
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+export default function NuevoFiadoPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-8">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <NuevoFiadoContent />
+    </Suspense>
+  );
+}
