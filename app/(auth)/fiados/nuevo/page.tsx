@@ -34,6 +34,8 @@ function NuevoFiadoContent() {
 
   const [paso, setPaso] = useState(1);
   const [clientePreseleccionadoId, setClientePreseleccionadoId] = useState<string | null>(null);
+  const [clientePreseleccionadoCargado, setClientePreseleccionadoCargado] = useState(false);
+  const [cargandoPreseleccionado, setCargandoPreseleccionado] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteConSaldo | null>(null);
   const [quienPidio, setQuienPidio] = useState<'cliente' | 'familiar'>('cliente');
   const [familiar, setFamiliar] = useState('');
@@ -48,10 +50,12 @@ function NuevoFiadoContent() {
     if (clienteId) {
       setClientePreseleccionadoId(clienteId);
       cargarCliente(clienteId);
+      setClientePreseleccionadoCargado(true);
     }
   }, [searchParams]);
 
   const cargarCliente = async (id: string) => {
+    setCargandoPreseleccionado(true);
     try {
       const response = await fetch(`/api/clientes/${id}`);
       if (response.ok) {
@@ -61,6 +65,8 @@ function NuevoFiadoContent() {
       }
     } catch (err) {
       console.error('Error al cargar cliente:', err);
+    } finally {
+      setCargandoPreseleccionado(false);
     }
   };
 
@@ -160,7 +166,224 @@ function NuevoFiadoContent() {
     setFiadoCreado(null);
   };
 
-  if (paso === 1 || clientePreseleccionadoId) {
+  if (cargandoPreseleccionado) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
+        </div>
+        <div className="flex justify-center py-12">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+        <p className="text-center text-gray-500">Cargando cliente...</p>
+      </div>
+    );
+  }
+
+if (clientePreseleccionadoCargado && clienteSeleccionado) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
+            <p className="text-sm text-gray-500">Paso 2 de 3</p>
+          </div>
+        </div>
+
+        <Card className="p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-semibold text-gray-900">{clienteSeleccionado.nombre}</p>
+              {clienteSeleccionado.apodo && <p className="text-sm text-gray-500">({clienteSeleccionado.apodo})</p>}
+            </div>
+            <span className={`text-sm font-medium ${clienteSeleccionado.saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              Debe: {formatearMoneda(clienteSeleccionado.saldo)}
+            </span>
+          </div>
+          <div className="mt-2 text-sm text-gray-500">
+            Tope: {formatearMoneda(clienteSeleccionado.tope_credito)} | Disponible:{' '}
+            <span className={disponible > 0 ? 'text-green-600 font-medium' : 'text-red-600'}>
+              {formatearMoneda(disponible)}
+            </span>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h3 className="font-medium text-gray-700 mb-3">¿Quién lo pide?</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setQuienPidio('cliente')}
+              className={`p-3 rounded-xl border-2 transition-colors ${
+                quienPidio === 'cliente'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="text-sm font-medium">Cliente</span>
+            </button>
+            <button
+              onClick={() => setQuienPidio('familiar')}
+              className={`p-3 rounded-xl border-2 transition-colors ${
+                quienPidio === 'familiar'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span className="text-sm font-medium">Familiar</span>
+            </button>
+          </div>
+
+          {quienPidio === 'familiar' && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del familiar</label>
+              <input
+                type="text"
+                placeholder="Carlos (hijo)"
+                value={familiar}
+                onChange={(e) => setFamiliar(e.target.value)}
+                className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4">
+          <h3 className="font-medium text-gray-700 mb-3">PRODUCTOS</h3>
+          <div className="space-y-3">
+            {productos.map((prod, index) => (
+              <div key={index} className="p-3 bg-gray-50 rounded-xl">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm text-gray-500">#{index + 1}</span>
+                  {productos.length > 1 && (
+                    <button
+                      onClick={() => eliminarProducto(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Nombre del producto"
+                  value={prod.producto}
+                  onChange={(e) => actualizarProducto(index, 'producto', e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-200 mb-2 text-base"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500">Cantidad</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={prod.cantidad}
+                      onChange={(e) => actualizarProducto(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Valor unitario</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={prod.valor_unitario || ''}
+                      onChange={(e) => actualizarProducto(index, 'valor_unitario', parseInt(e.target.value) || 0)}
+                      className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
+                      placeholder="$"
+                    />
+                  </div>
+                </div>
+                {prod.cantidad > 0 && prod.valor_unitario > 0 && (
+                  <p className="text-right text-sm text-gray-500 mt-1">
+                    Subtotal: {formatearMoneda(prod.cantidad * prod.valor_unitario)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={agregarProducto}
+            className="w-full mt-3 h-10 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:border-gray-400 flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Agregar producto
+          </button>
+        </Card>
+
+        <Card className="p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Nota (opcional)</label>
+          <input
+            type="text"
+            placeholder="Dijo que paga el viernes..."
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-base"
+          />
+        </Card>
+
+        <Card className="p-4 bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-lg font-semibold">TOTAL:</span>
+            <span className="text-2xl font-bold text-gray-900">{formatearMoneda(total)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Nuevo saldo:</span>
+            <span className={`text-lg font-semibold ${superaTope ? 'text-red-600' : 'text-gray-900'}`}>
+              {formatearMoneda(nuevoSaldo)}
+            </span>
+          </div>
+          {superaTope && (
+            <p className="text-red-600 text-sm mt-2 font-medium">
+              Supera el tope. Disponible: {formatearMoneda(disponible)}
+            </p>
+          )}
+        </Card>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+            <p className="text-red-600 text-sm text-center">{error}</p>
+          </div>
+        )}
+
+        <Button
+          className="w-full h-14 text-lg"
+          disabled={guardando || superaTope || total === 0}
+          onClick={handleConfirmar}
+        >
+          {guardando ? 'Registrando...' : 'CONFIRMAR FIADO'}
+        </Button>
+      </div>
+    );
+  }
+
+  if (paso === 1) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -179,7 +402,30 @@ function NuevoFiadoContent() {
 
         <SelectorCliente
           onSeleccionar={seleccionarCliente}
-          clientePreseleccionadoId={clientePreseleccionadoId || undefined}
+        />
+      </div>
+    );
+  }
+
+  if (paso === 1) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
+        </div>
+
+        <p className="text-sm text-gray-500">Paso 1 de 3 — Selecciona el cliente</p>
+
+        <SelectorCliente
+          onSeleccionar={seleccionarCliente}
         />
       </div>
     );
