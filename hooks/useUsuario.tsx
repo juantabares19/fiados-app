@@ -46,7 +46,8 @@ export function UsuarioProvider({ children }: { children: ReactNode }) {
         } else {
           setUsuario(null);
         }
-      } catch {
+      } catch (error) {
+        console.error('Error al verificar usuario:', error);
         setUsuario(null);
       } finally {
         setCargando(false);

@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { TOKEN_EXPIRY, COOKIE_MAX_AGE } from '@/lib/constants';
 
 const jwtSecretRaw = process.env.JWT_SECRET;
 if (!jwtSecretRaw) {
@@ -20,7 +21,7 @@ export async function createToken(payload: Omit<UsuarioPayload, 'iat' | 'exp'>):
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(TOKEN_EXPIRY)
     .sign(JWT_SECRET);
 }
 
@@ -50,7 +51,7 @@ export async function getTokenFromCookie(cookieHeader: string | null): Promise<U
 
 export function createSessionCookie(token: string): string {
   const isProduction = process.env.NODE_ENV === 'production';
-  const maxAge = 7 * 24 * 60 * 60;
+  const maxAge = COOKIE_MAX_AGE;
 
   return `session_token=${token}; Path=/; HttpOnly; SameSite=Strict${isProduction ? '; Secure' : ''}; Max-Age=${maxAge}`;
 }

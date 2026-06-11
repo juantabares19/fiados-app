@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
+import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 function puedeCancelarFiado(
   fiado: { created_at: string; usuario_id: string },
@@ -72,8 +73,8 @@ export async function GET(
     return NextResponse.json({
       id: fiado.id,
       cliente_id: fiado.cliente_id,
-      cliente_nombre: (fiado.clientes as unknown as { nombre: string })?.nombre || '',
-      usuario_nombre: (fiado.usuarios as unknown as { nombre: string })?.nombre || '',
+      cliente_nombre: (fiado.clientes as ClienteRelacion | null)?.nombre ?? '',
+      usuario_nombre: (fiado.usuarios as UsuarioRelacion | null)?.nombre ?? '',
       quien_pidio: fiado.quien_pidio,
       familiar: fiado.familiar,
       nota: fiado.nota,

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
+import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
+import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
   try {
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
         usuarios!inner(nombre)
       `)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(QUERY_LIMIT_DEFAULT);
 
     if (clienteId) {
       query = query.eq('cliente_id', clienteId);
@@ -77,8 +79,8 @@ export async function GET(request: Request) {
         return {
           id: fiado.id,
           cliente_id: fiado.cliente_id,
-          cliente_nombre: (fiado.clientes as unknown as { nombre: string })?.nombre || '',
-          usuario_nombre: (fiado.usuarios as unknown as { nombre: string })?.nombre || '',
+          cliente_nombre: (fiado.clientes as ClienteRelacion | null)?.nombre ?? '',
+          usuario_nombre: (fiado.usuarios as UsuarioRelacion | null)?.nombre ?? '',
           quien_pidio: fiado.quien_pidio,
           familiar: fiado.familiar,
           nota: fiado.nota,

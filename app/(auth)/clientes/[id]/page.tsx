@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useUsuario } from '@/hooks/useUsuario';
 import { formatearMoneda, formatearFechaCorta, formatearHora, calcularEstadoMora } from '@/lib/utils';
+import { generarMensajeEstadoCuenta, generarMensajeRecordatorio, abrirWhatsApp } from '@/lib/whatsapp';
+import { useConfig } from '@/contexts/ConfigContext';
 import Link from 'next/link';
 
 interface DetalleProducto {
@@ -50,10 +52,13 @@ export default function ClientePerfilPage() {
   const params = useParams();
   const router = useRouter();
   const { esDueño } = useUsuario();
+  const { config } = useConfig();
+  const nombreTienda = config?.nombre_tienda ?? 'Mi Tienda';
   const [cliente, setCliente] = useState<ClienteConSaldo | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [mostrarModalBloqueo, setMostrarModalBloqueo] = useState(false);
+  const [mostrarModalWhatsApp, setMostrarModalWhatsApp] = useState(false);
   const [bloqueando, setBloqueando] = useState(false);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
@@ -217,7 +222,7 @@ export default function ClientePerfilPage() {
       <Button
         variant="outline"
         className="w-full h-12"
-        onClick={() => alert('Disponible próximamente')}
+        onClick={() => setMostrarModalWhatsApp(true)}
       >
         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -365,6 +370,44 @@ export default function ClientePerfilPage() {
             Este cliente aún debe {formatearMoneda(cliente.saldo)}.
           </p>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={mostrarModalWhatsApp}
+        onClose={() => setMostrarModalWhatsApp(false)}
+        title="Enviar por WhatsApp"
+      >
+        <div className="space-y-3">
+          <p className="text-gray-600 text-sm">Selecciona el mensaje que deseas enviar:</p>
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                if (cliente) {
+                  const msg = generarMensajeEstadoCuenta(cliente, nombreTienda);
+                  abrirWhatsApp(cliente.celular, msg);
+                }
+                setMostrarModalWhatsApp(false);
+              }}
+              className="w-full p-4 text-left rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-colors"
+            >
+              <p className="font-medium text-gray-800">Estado de cuenta</p>
+              <p className="text-sm text-gray-500">Resumen de lo que debe actualmente</p>
+            </button>
+            <button
+              onClick={() => {
+                if (cliente) {
+                  const msg = generarMensajeRecordatorio(cliente, nombreTienda);
+                  abrirWhatsApp(cliente.celular, msg);
+                }
+                setMostrarModalWhatsApp(false);
+              }}
+              className="w-full p-4 text-left rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-colors"
+            >
+              <p className="font-medium text-gray-800">Recordatorio de pago</p>
+              <p className="text-sm text-gray-500">Mensaje amable recordando el pago</p>
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

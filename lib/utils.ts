@@ -55,14 +55,16 @@ export interface EstadoMoraResult {
   emoji: string;
 }
 
+import { DIAS_MORA_ALERTA, DIAS_MORA_CRITICO } from '@/lib/constants';
+
 export function calcularEstadoMora(saldo: number, diasSinMovimiento: number): EstadoMoraResult {
   if (saldo === 0) {
     return { estado: 'al_dia', label: 'Al día', color: 'text-green-600', bgColor: 'bg-green-50', emoji: '🟢' };
   }
-  if (diasSinMovimiento < 15) {
+  if (diasSinMovimiento < DIAS_MORA_ALERTA) {
     return { estado: 'al_dia', label: 'Al día', color: 'text-green-600', bgColor: 'bg-green-50', emoji: '🟢' };
   }
-  if (diasSinMovimiento < 30) {
+  if (diasSinMovimiento < DIAS_MORA_CRITICO) {
     return { estado: 'moroso', label: 'Moroso', color: 'text-orange-600', bgColor: 'bg-orange-50', emoji: '🟠' };
   }
   return { estado: 'critico', label: 'Crítico', color: 'text-red-600', bgColor: 'bg-red-50', emoji: '🔴' };

@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatearMoneda, formatearFechaCorta, calcularEstadoMora } from '@/lib/utils';
+import { generarMensajeRecordatorio, BotonWhatsApp } from '@/lib/whatsapp';
+import { useConfig } from '@/contexts/ConfigContext';
 
 interface ClienteMora {
   id: string;
@@ -39,6 +41,8 @@ type FilterTipo = 'todos' | 'morosos' | 'criticos';
 
 function MorososContent() {
   const router = useRouter();
+  const { config } = useConfig();
+  const nombreTienda = config?.nombre_tienda ?? 'Mi Tienda';
   const [clientes, setClientes] = useState<ClienteMora[]>([]);
   const [resumen, setResumen] = useState<ResumenMora | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -74,8 +78,16 @@ function MorososContent() {
   const clientesCriticos = clientesFiltrados.filter(c => c.estado_mora === 'critico');
   const clientesMorosos = clientesFiltrados.filter(c => c.estado_mora === 'moroso');
 
-  const handleCobrar = () => {
-    alert('Disponible en la próxima versión');
+  const handleCobrar = (cliente: ClienteMora) => {
+    const msg = generarMensajeRecordatorio(cliente, nombreTienda);
+    BotonWhatsApp.enviar(cliente.celular, msg);
+  };
+
+  const handleCobrarTodos = () => {
+    clientesFiltrados.forEach(cliente => {
+      const msg = generarMensajeRecordatorio(cliente, nombreTienda);
+      BotonWhatsApp.enviar(cliente.celular, msg);
+    });
   };
 
   const toggleActivo = filtro === 'todos' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-600 border-gray-200';
@@ -190,7 +202,7 @@ function MorososContent() {
                             </p>
                           )}
                           <div className="flex gap-2 mt-3">
-                            <Button size="sm" onClick={handleCobrar}>
+                            <Button size="sm" onClick={() => handleCobrar(cliente)}>
                               📱 Cobrar
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => router.push(`/clientes/${cliente.id}`)}>
@@ -230,7 +242,7 @@ function MorososContent() {
                             </p>
                           )}
                           <div className="flex gap-2 mt-3">
-                            <Button size="sm" onClick={handleCobrar}>
+                            <Button size="sm" onClick={() => handleCobrar(cliente)}>
                               📱 Cobrar
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => router.push(`/clientes/${cliente.id}`)}>
@@ -246,7 +258,7 @@ function MorososContent() {
 
               <Button
                 className="w-full h-12"
-                onClick={handleCobrar}
+                onClick={handleCobrarTodos}
               >
                 📱 Cobrar a todos
               </Button>

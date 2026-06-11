@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
+import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
+import type { UsuarioRelacion } from '@/lib/database.types';
 
 const METODOS_PAGO = ['efectivo', 'nequi', 'daviplata', 'llaves', 'otro'];
 
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
         usuarios!inner(nombre)
       `)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(QUERY_LIMIT_DEFAULT);
 
     if (clienteId) {
       query = query.eq('cliente_id', clienteId);
@@ -79,8 +81,8 @@ export async function GET(request: Request) {
       id: abono.id,
       cliente_id: abono.cliente_id,
       cliente_nombre: clientesMap[abono.cliente_id] || '',
-      usuario_id: (abono.usuarios as unknown as { id: string })?.id || '',
-      usuario_nombre: (abono.usuarios as unknown as { nombre: string })?.nombre || '',
+      usuario_id: (abono.usuarios as UsuarioRelacion | null)?.id ?? '',
+      usuario_nombre: (abono.usuarios as UsuarioRelacion | null)?.nombre ?? '',
       monto: abono.monto,
       metodo_pago: abono.metodo_pago,
       nota: abono.nota,

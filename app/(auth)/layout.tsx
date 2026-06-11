@@ -5,6 +5,7 @@ import { useUsuario } from '@/hooks/useUsuario';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { UsuarioProvider } from '@/hooks/useUsuario';
+import { ConfigProvider } from '@/contexts/ConfigContext';
 
 function AuthLayoutInner({ children }: { children: React.ReactNode }) {
   const [isNavOpen, setIsNavOpen] = useState(false);
@@ -35,7 +36,9 @@ function AuthLayoutInner({ children }: { children: React.ReactNode }) {
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <UsuarioProvider>
-      <AuthLayoutInner>{children}</AuthLayoutInner>
+      <ConfigProvider>
+        <AuthLayoutInner>{children}</AuthLayoutInner>
+      </ConfigProvider>
     </UsuarioProvider>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
+import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
   try {
@@ -105,9 +106,9 @@ export async function GET(request: Request) {
       });
 
       fiados.forEach(f => {
-        const usuarioId = (f.usuarios as unknown as { id: string })?.id;
-        const usuarioNombre = (f.usuarios as unknown as { nombre: string })?.nombre || '';
-        const clienteNombre = (f.clientes as unknown as { nombre: string })?.nombre || '';
+        const usuarioId = (f.usuarios as UsuarioRelacion | null)?.id ?? '';
+        const usuarioNombre = (f.usuarios as UsuarioRelacion | null)?.nombre ?? '';
+        const clienteNombre = (f.clientes as ClienteRelacion | null)?.nombre ?? '';
 
         if (tenderoId && usuarioId !== tenderoId) return;
 
@@ -156,9 +157,9 @@ export async function GET(request: Request) {
 
     if (abonos) {
       abonos.forEach(a => {
-        const usuarioId = (a.usuarios as unknown as { id: string })?.id;
-        const usuarioNombre = (a.usuarios as unknown as { nombre: string })?.nombre || '';
-        const clienteNombre = (a.clientes as unknown as { nombre: string })?.nombre || '';
+        const usuarioId = (a.usuarios as UsuarioRelacion | null)?.id ?? '';
+        const usuarioNombre = (a.usuarios as UsuarioRelacion | null)?.nombre ?? '';
+        const clienteNombre = (a.clientes as ClienteRelacion | null)?.nombre ?? '';
 
         if (tenderoId && usuarioId !== tenderoId) return;
 

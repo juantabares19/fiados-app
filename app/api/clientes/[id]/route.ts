@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
+import { DIAS_MORA_ALERTA, DIAS_MORA_CRITICO } from '@/lib/constants';
 
 export async function GET(
   request: Request,
@@ -82,8 +83,8 @@ export async function GET(
     const saldo = saldos?.saldo || 0;
     let estadoMora: 'al_dia' | 'moroso' | 'critico' = 'al_dia';
     if (saldo > 0) {
-      if (diasSinMovimiento >= 30) estadoMora = 'critico';
-      else if (diasSinMovimiento >= 15) estadoMora = 'moroso';
+      if (diasSinMovimiento >= DIAS_MORA_CRITICO) estadoMora = 'critico';
+      else if (diasSinMovimiento >= DIAS_MORA_ALERTA) estadoMora = 'moroso';
     }
 
     return NextResponse.json({
