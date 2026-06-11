@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
 
 const METODOS_PAGO = ['efectivo', 'nequi', 'daviplata', 'llaves', 'otro'];
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const desde = searchParams.get('desde');
     const hasta = searchParams.get('hasta');
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     let query = supabase
       .from('abonos')
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')

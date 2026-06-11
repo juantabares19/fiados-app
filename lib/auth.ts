@@ -1,8 +1,12 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'default-secret-change-in-production'
-);
+const jwtSecretRaw = process.env.JWT_SECRET;
+if (!jwtSecretRaw) {
+  throw new Error(
+    'JWT_SECRET environment variable is required. The application cannot start without it.'
+  );
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
 
 export interface UsuarioPayload extends JWTPayload {
   id: string;

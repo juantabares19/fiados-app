@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const buscar = searchParams.get('buscar');
     const filtro = searchParams.get('filtro') || 'todos';
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     let query = supabase
       .from('clientes')
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     const { data: existente } = await supabase
       .from('clientes')

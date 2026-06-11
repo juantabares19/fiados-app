@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const hasta = searchParams.get('hasta');
     const tenderoId = searchParams.get('tendero');
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     let fechaActual = fecha;
     let fechaInicio: string | undefined;

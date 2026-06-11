@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(
@@ -25,7 +25,7 @@ export async function GET(
     }
 
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     const { data: cliente, error } = await supabase
       .from('clientes')
@@ -145,7 +145,7 @@ export async function PUT(
       );
     }
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     const { data: actual } = await supabase
       .from('clientes')
@@ -243,7 +243,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
 
     const { data: actual } = await supabase
       .from('clientes')

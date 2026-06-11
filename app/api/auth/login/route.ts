@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import { createToken, createSessionCookie } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin;
     const { data: usuario, error } = await supabase
       .from('usuarios')
       .select('id, nombre, celular, pin, rol, activo')
