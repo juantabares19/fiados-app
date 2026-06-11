@@ -32,9 +32,9 @@ export async function GET(request: Request) {
 
     const supabase = supabaseAdmin;
 
-    const { data: clientes, error } = await supabase
+    const { data: saldos, error } = await supabase
       .from('saldos_clientes')
-      .select('id, nombre, apodo, celular, estado, saldo, tope_credito')
+      .select('id, nombre, celular, estado, saldo')
       .gt('saldo', 0)
       .order('saldo', { ascending: false });
 
@@ -43,7 +43,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Error al obtener morosos' }, { status: 500 });
     }
 
-    const clienteIds = (clientes || []).map(c => c.id);
+    const clienteIds = (saldos || []).map(c => c.id);
+
+    const { data: perfilesData } = clienteIds.length > 0
+      ? await supabase.from('clientes').select('id, apodo, tope_credito').in('id', clienteIds)
+      : { data: [] };
+
+    const perfilesPorId = Object.fromEntries(
+      (perfilesData || []).map(p => [p.id, p])
+    );
+
+    const clientes = (saldos || []).map(s => ({
+      ...s,
+      apodo: perfilesPorId[s.id]?.apodo ?? null,
+      tope_credito: perfilesPorId[s.id]?.tope_credito ?? 0,
+    }));
 
     const { data: ultimosFiados } = await supabase
       .from('fiados')
