@@ -1,3 +1,4 @@
+// TODO: Migrar a Server Component + Client Component separado (depende de useConfig y SoloDueño que requieren contexto cliente)
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';

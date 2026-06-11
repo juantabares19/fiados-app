@@ -1,3 +1,4 @@
+// TODO: Migrar a Server Component + Client Component separado cuando useUsuario() se reemplace por headers() server-side
 'use client';
 
 import { useEffect, useState } from 'react';

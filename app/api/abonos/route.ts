@@ -30,6 +30,11 @@ export async function GET(request: Request) {
     const fecha = searchParams.get('fecha');
     const desde = searchParams.get('desde');
     const hasta = searchParams.get('hasta');
+    const pageParam = searchParams.get('page');
+    const usePagination = pageParam !== null;
+    const page = Math.max(1, parseInt(pageParam || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || String(QUERY_LIMIT_DEFAULT))));
+    const offset = (page - 1) * limit;
 
     const supabase = supabaseAdmin;
 
@@ -44,8 +49,7 @@ export async function GET(request: Request) {
         created_at,
         usuarios!inner(nombre)
       `)
-      .order('created_at', { ascending: false })
-      .limit(QUERY_LIMIT_DEFAULT);
+      .order('created_at', { ascending: false });
 
     if (clienteId) {
       query = query.eq('cliente_id', clienteId);
@@ -59,7 +63,9 @@ export async function GET(request: Request) {
       query = query.gte('created_at', `${desde}T00:00:00`).lte('created_at', `${hasta}T23:59:59`);
     }
 
-    const { data: abonos, error } = await query;
+    const { data: abonos, error } = await (usePagination
+      ? query.range(offset, offset + limit - 1)
+      : query.limit(QUERY_LIMIT_DEFAULT));
 
     if (error) {
       console.error('Error fetching abonos:', error);
@@ -88,6 +94,21 @@ export async function GET(request: Request) {
       nota: abono.nota,
       created_at: abono.created_at,
     }));
+
+    if (usePagination) {
+      let countQuery = supabase.from('abonos').select('*', { count: 'exact', head: true });
+      if (clienteId) countQuery = countQuery.eq('cliente_id', clienteId);
+      if (fecha) {
+        countQuery = countQuery.gte('created_at', `${fecha}T00:00:00`).lte('created_at', `${fecha}T23:59:59`);
+      } else if (desde && hasta) {
+        countQuery = countQuery.gte('created_at', `${desde}T00:00:00`).lte('created_at', `${hasta}T23:59:59`);
+      }
+      const { count } = await countQuery;
+      return NextResponse.json({
+        data: abonosConCliente,
+        pagination: { page, limit, total: count || 0, total_pages: Math.ceil((count || 0) / limit) },
+      });
+    }
 
     return NextResponse.json(abonosConCliente);
   } catch (error) {
