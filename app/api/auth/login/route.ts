@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const supabase = supabaseAdmin;
     const { data: usuario, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, celular, pin, rol, activo')
+      .select('id, nombre, celular, pin, rol, activo, token_version')
       .eq('celular', celular)
       .single();
 
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       nombre: usuario.nombre,
       celular: usuario.celular,
       rol: usuario.rol as 'dueño' | 'tendero',
+      token_version: usuario.token_version ?? 0,
     });
 
     const cookie = createSessionCookie(token);

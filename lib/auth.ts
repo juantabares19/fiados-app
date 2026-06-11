@@ -13,13 +13,14 @@ export interface UsuarioPayload extends JWTPayload {
   nombre: string;
   celular: string;
   rol: 'dueño' | 'tendero';
+  token_version: number;
 }
 
 export async function createToken(payload: Omit<UsuarioPayload, 'iat' | 'exp'>): Promise<string> {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('30d')
+    .setExpirationTime('7d')
     .sign(JWT_SECRET);
 }
 
@@ -49,13 +50,13 @@ export async function getTokenFromCookie(cookieHeader: string | null): Promise<U
 
 export function createSessionCookie(token: string): string {
   const isProduction = process.env.NODE_ENV === 'production';
-  const maxAge = 30 * 24 * 60 * 60;
+  const maxAge = 7 * 24 * 60 * 60;
 
-  return `session_token=${token}; Path=/; HttpOnly; SameSite=Lax${isProduction ? '; Secure' : ''}; Max-Age=${maxAge}`;
+  return `session_token=${token}; Path=/; HttpOnly; SameSite=Strict${isProduction ? '; Secure' : ''}; Max-Age=${maxAge}`;
 }
 
 export function deleteSessionCookie(): string {
-  return 'session_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0';
+  return 'session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0';
 }
 
 export function encodeUserData(payload: UsuarioPayload): string {

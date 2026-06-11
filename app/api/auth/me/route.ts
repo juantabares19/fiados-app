@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { supabaseAdmin } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
   try {
@@ -19,16 +20,31 @@ export async function GET(request: Request) {
       );
     }
 
-    const usuario = await verifyToken(token);
+    const payload = await verifyToken(token);
 
-    if (!usuario) {
+    if (!payload) {
       return NextResponse.json(
         { error: 'Sesión inválida' },
         { status: 401 }
       );
     }
 
-    return NextResponse.json({ usuario });
+    const { data: dbUser } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, activo, token_version')
+      .eq('id', payload.id)
+      .single();
+
+    if (!dbUser || !dbUser.activo || dbUser.token_version !== (payload.token_version ?? -1)) {
+      const response = NextResponse.json(
+        { error: 'Usuario inactivo o sesión revocada' },
+        { status: 401 }
+      );
+      response.cookies.set('session_token', '', { maxAge: 0, path: '/' });
+      return response;
+    }
+
+    return NextResponse.json({ usuario: payload });
   } catch (error) {
     console.error('Me error:', error);
     return NextResponse.json(

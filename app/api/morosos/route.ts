@@ -21,6 +21,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
     }
 
+    // Protegido: solo rol 'dueño'
+    if (usuario.rol !== 'dueño') {
+      return NextResponse.json(
+        { error: 'No tiene permisos para acceder a este recurso' },
+        { status: 403 }
+      );
+    }
+
     const supabase = supabaseAdmin;
 
     const { data: clientes, error } = await supabase
