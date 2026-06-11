@@ -97,6 +97,21 @@ CREATE TABLE IF NOT EXISTS auditoria (
 COMMENT ON TABLE auditoria IS 'Registro de todo lo que pasa en el sistema';
 
 -- ================================================
+-- TABLA: configuracion
+-- ================================================
+CREATE TABLE IF NOT EXISTS configuracion (
+  clave VARCHAR(100) PRIMARY KEY,
+  valor TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+COMMENT ON TABLE configuracion IS 'Configuración general de la tienda (nombre, preferencias, etc.)';
+
+INSERT INTO configuracion (clave, valor)
+VALUES ('nombre_tienda', 'Mi Tienda')
+ON CONFLICT (clave) DO NOTHING;
+
+-- ================================================
 -- ÍNDICES
 -- ================================================
 
@@ -147,17 +162,58 @@ COMMENT ON VIEW saldos_clientes IS 'Calcula el saldo de cada cliente';
 
 CREATE OR REPLACE FUNCTION registrar_auditoria()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_registro_id UUID;
+  v_usuario_id  UUID;
+  v_datos_antes JSONB;
+  v_datos_despues JSONB;
+  v_accion VARCHAR(20);
 BEGIN
-    INSERT INTO auditoria (tabla, registro_id, accion, usuario_id, datos_antes, datos_despues)
-    VALUES (
-        TG_TABLE_NAME,
-        NEW.id,
-        TG_OP,
-        NEW.created_by,
-        CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END,
-        CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN row_to_json(NEW) ELSE NULL END
-    );
-    RETURN NEW;
+  -- Mapear TG_OP al CHECK constraint de auditoria ('crear'|'editar'|'eliminar')
+  v_accion := CASE TG_OP
+    WHEN 'INSERT' THEN 'crear'
+    WHEN 'UPDATE' THEN 'editar'
+    WHEN 'DELETE' THEN 'eliminar'
+  END;
+
+  -- Determinar registro_id y snapshots según la operación
+  IF TG_OP = 'DELETE' THEN
+    v_registro_id   := OLD.id;
+    v_datos_antes   := to_jsonb(OLD);
+    v_datos_despues := NULL;
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_registro_id   := NEW.id;
+    v_datos_antes   := to_jsonb(OLD);
+    v_datos_despues := to_jsonb(NEW);
+  ELSE -- INSERT
+    v_registro_id   := NEW.id;
+    v_datos_antes   := NULL;
+    v_datos_despues := to_jsonb(NEW);
+  END IF;
+
+  -- Intentar obtener usuario de la sesión local (futuro: SET LOCAL app.current_user_id)
+  BEGIN
+    v_usuario_id := current_setting('app.current_user_id', true)::UUID;
+  EXCEPTION WHEN OTHERS THEN
+    v_usuario_id := NULL;
+  END;
+
+  -- Fallback: campo de usuario según tabla (clientes usa created_by; fiados/abonos usan usuario_id)
+  IF v_usuario_id IS NULL THEN
+    IF TG_TABLE_NAME = 'clientes' THEN
+      v_usuario_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.created_by ELSE NEW.created_by END;
+    ELSE
+      v_usuario_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.usuario_id ELSE NEW.usuario_id END;
+    END IF;
+  END IF;
+
+  INSERT INTO auditoria (tabla, registro_id, accion, usuario_id, datos_antes, datos_despues)
+  VALUES (TG_TABLE_NAME, v_registro_id, v_accion, v_usuario_id, v_datos_antes, v_datos_despues);
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -187,6 +243,7 @@ ALTER TABLE fiados ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fiado_detalle ENABLE ROW LEVEL SECURITY;
 ALTER TABLE abonos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auditoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para usuarios
 CREATE POLICY "usuarios_select" ON usuarios FOR SELECT USING (true);
@@ -223,6 +280,12 @@ CREATE POLICY "auditoria_select" ON auditoria FOR SELECT USING (true);
 CREATE POLICY "auditoria_insert" ON auditoria FOR INSERT WITH CHECK (true);
 CREATE POLICY "auditoria_update" ON auditoria FOR UPDATE USING (true);
 CREATE POLICY "auditoria_delete" ON auditoria FOR DELETE USING (true);
+
+-- Políticas para configuracion
+CREATE POLICY "configuracion_select" ON configuracion FOR SELECT USING (true);
+CREATE POLICY "configuracion_insert" ON configuracion FOR INSERT WITH CHECK (true);
+CREATE POLICY "configuracion_update" ON configuracion FOR UPDATE USING (true);
+CREATE POLICY "configuracion_delete" ON configuracion FOR DELETE USING (true);
 
 -- ================================================
 -- USUARIO DEMO (para testing)
