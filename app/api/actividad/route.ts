@@ -106,9 +106,9 @@ export async function GET(request: Request) {
       });
 
       fiados.forEach(f => {
-        const usuarioId = (f.usuarios as UsuarioRelacion | null)?.id ?? '';
-        const usuarioNombre = (f.usuarios as UsuarioRelacion | null)?.nombre ?? '';
-        const clienteNombre = (f.clientes as ClienteRelacion | null)?.nombre ?? '';
+        const usuarioId = (f.usuarios as unknown as UsuarioRelacion | null)?.id ?? '';
+        const usuarioNombre = (f.usuarios as unknown as UsuarioRelacion | null)?.nombre ?? '';
+        const clienteNombre = (f.clientes as unknown as ClienteRelacion | null)?.nombre ?? '';
 
         if (tenderoId && usuarioId !== tenderoId) return;
 
@@ -157,9 +157,9 @@ export async function GET(request: Request) {
 
     if (abonos) {
       abonos.forEach(a => {
-        const usuarioId = (a.usuarios as UsuarioRelacion | null)?.id ?? '';
-        const usuarioNombre = (a.usuarios as UsuarioRelacion | null)?.nombre ?? '';
-        const clienteNombre = (a.clientes as ClienteRelacion | null)?.nombre ?? '';
+        const usuarioId = (a.usuarios as unknown as UsuarioRelacion | null)?.id ?? '';
+        const usuarioNombre = (a.usuarios as unknown as UsuarioRelacion | null)?.nombre ?? '';
+        const clienteNombre = (a.clientes as unknown as ClienteRelacion | null)?.nombre ?? '';
 
         if (tenderoId && usuarioId !== tenderoId) return;
 

@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       .select(`
         id,
         cliente_id,
+        usuario_id,
         monto,
         metodo_pago,
         nota,
@@ -87,8 +88,8 @@ export async function GET(request: Request) {
       id: abono.id,
       cliente_id: abono.cliente_id,
       cliente_nombre: clientesMap[abono.cliente_id] || '',
-      usuario_id: (abono.usuarios as UsuarioRelacion | null)?.id ?? '',
-      usuario_nombre: (abono.usuarios as UsuarioRelacion | null)?.nombre ?? '',
+      usuario_id: (abono as any).usuario_id ?? '',
+      usuario_nombre: (abono.usuarios as unknown as { nombre: string } | null)?.nombre ?? '',
       monto: abono.monto,
       metodo_pago: abono.metodo_pago,
       nota: abono.nota,

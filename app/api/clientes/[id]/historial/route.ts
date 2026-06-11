@@ -125,7 +125,7 @@ export async function GET(request: Request) {
             quien_pidio: f.quien_pidio,
             familiar: f.familiar,
             nota: f.nota,
-            usuario_nombre: (f.usuarios as UsuarioRelacion | null)?.nombre ?? '',
+            usuario_nombre: (f.usuarios as unknown as UsuarioRelacion | null)?.nombre ?? '',
             created_at: f.created_at,
             puede_cancelar: puedeCancelar,
             detalles: detallesPorFiado[f.id] || [],
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
             monto: a.monto,
             metodo_pago: a.metodo_pago,
             nota: a.nota,
-            usuario_nombre: (a.usuarios as UsuarioRelacion | null)?.nombre ?? '',
+            usuario_nombre: (a.usuarios as unknown as UsuarioRelacion | null)?.nombre ?? '',
             created_at: a.created_at,
           });
         });

@@ -81,8 +81,8 @@ export async function getFiados(): Promise<FiadoRaw[]> {
   return (data || []).map(f => ({
     id: f.id,
     cliente_id: f.cliente_id,
-    cliente_nombre: (f.clientes as ClienteRelacion | null)?.nombre ?? '',
-    usuario_nombre: (f.usuarios as UsuarioRelacion | null)?.nombre ?? '',
+    cliente_nombre: (f.clientes as unknown as ClienteRelacion | null)?.nombre ?? '',
+    usuario_nombre: (f.usuarios as unknown as UsuarioRelacion | null)?.nombre ?? '',
     usuario_id: f.usuario_id,
     quien_pidio: f.quien_pidio as 'cliente' | 'familiar',
     familiar: f.familiar,

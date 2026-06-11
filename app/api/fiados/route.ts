@@ -85,8 +85,8 @@ export async function GET(request: Request) {
         return {
           id: fiado.id,
           cliente_id: fiado.cliente_id,
-          cliente_nombre: (fiado.clientes as ClienteRelacion | null)?.nombre ?? '',
-          usuario_nombre: (fiado.usuarios as UsuarioRelacion | null)?.nombre ?? '',
+          cliente_nombre: (fiado.clientes as unknown as ClienteRelacion | null)?.nombre ?? '',
+          usuario_nombre: (fiado.usuarios as unknown as UsuarioRelacion | null)?.nombre ?? '',
           quien_pidio: fiado.quien_pidio,
           familiar: fiado.familiar,
           nota: fiado.nota,
