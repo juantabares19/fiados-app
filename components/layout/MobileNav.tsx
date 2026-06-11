@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Modal } from '@/components/ui/Modal';
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -81,6 +83,7 @@ export function MobileNav({
   onLogout,
 }: MobileNavProps) {
   const pathname = usePathname();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const filteredMenuItems = menuItems.filter(
     (item) => !item.ownerOnly || userRole === 'dueño'
@@ -155,7 +158,7 @@ export function MobileNav({
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
           <button
-            onClick={onLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="w-full flex items-center justify-center gap-2 h-12 rounded-xl text-red-600 font-medium hover:bg-red-50 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,6 +168,21 @@ export function MobileNav({
           </button>
         </div>
       </nav>
+
+      <Modal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        title="Cerrar sesión"
+        confirmText="Cerrar sesión"
+        cancelText="Cancelar"
+        variant="danger"
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout();
+        }}
+      >
+        ¿Estás seguro de que deseas cerrar sesión?
+      </Modal>
     </>
   );
 }

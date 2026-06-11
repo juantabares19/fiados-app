@@ -6,9 +6,10 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   className?: string;
+  'aria-label'?: string;
 }
 
-export function Badge({ children, variant = 'neutral', className }: BadgeProps) {
+export function Badge({ children, variant = 'neutral', className, 'aria-label': ariaLabel }: BadgeProps) {
   const variants: Record<BadgeVariant, string> = {
     success: 'bg-green-100 text-green-800',
     warning: 'bg-orange-100 text-orange-800',
@@ -18,6 +19,8 @@ export function Badge({ children, variant = 'neutral', className }: BadgeProps) 
 
   return (
     <span
+      role="status"
+      aria-label={ariaLabel}
       className={cn(
         'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium',
         variants[variant],
