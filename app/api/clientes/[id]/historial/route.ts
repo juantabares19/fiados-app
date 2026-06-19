@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { inicioDia, finDia } from '@/lib/fechas';
 import type { UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
@@ -34,8 +35,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
     }
 
-    const desdeFecha = desde ? `${desde}T00:00:00` : undefined;
-    const hastaFecha = hasta ? `${hasta}T23:59:59` : undefined;
+    const desdeFecha = desde ? inicioDia(desde) : undefined;
+    const hastaFecha = hasta ? finDia(hasta) : undefined;
 
     let totalFiado = 0;
     let totalAbonado = 0;

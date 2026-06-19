@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
 import { esNumeroPositivo } from '@/lib/validation';
+import { inicioDia, finDia } from '@/lib/fechas';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
 
 const METODOS_PAGO = ['efectivo', 'nequi', 'daviplata', 'llaves', 'otro'];
@@ -43,11 +44,9 @@ export async function GET(request: Request) {
     }
 
     if (fecha) {
-      const startOfDay = `${fecha}T00:00:00`;
-      const endOfDay = `${fecha}T23:59:59`;
-      query = query.gte('created_at', startOfDay).lte('created_at', endOfDay);
+      query = query.gte('created_at', inicioDia(fecha)).lte('created_at', finDia(fecha));
     } else if (desde && hasta) {
-      query = query.gte('created_at', `${desde}T00:00:00`).lte('created_at', `${hasta}T23:59:59`);
+      query = query.gte('created_at', inicioDia(desde)).lte('created_at', finDia(hasta));
     }
 
     const { data: abonos, error } = await (usePagination
@@ -86,9 +85,9 @@ export async function GET(request: Request) {
       let countQuery = supabase.from('abonos').select('*', { count: 'exact', head: true });
       if (clienteId) countQuery = countQuery.eq('cliente_id', clienteId);
       if (fecha) {
-        countQuery = countQuery.gte('created_at', `${fecha}T00:00:00`).lte('created_at', `${fecha}T23:59:59`);
+        countQuery = countQuery.gte('created_at', inicioDia(fecha)).lte('created_at', finDia(fecha));
       } else if (desde && hasta) {
-        countQuery = countQuery.gte('created_at', `${desde}T00:00:00`).lte('created_at', `${hasta}T23:59:59`);
+        countQuery = countQuery.gte('created_at', inicioDia(desde)).lte('created_at', finDia(hasta));
       }
       const { count } = await countQuery;
       return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { inicioDia, finDia, fechaHoyColombia } from '@/lib/fechas';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
@@ -21,16 +22,16 @@ export async function GET(request: Request) {
     let fechaFin: string | undefined;
 
     if (desde && hasta) {
-      fechaInicio = `${desde}T00:00:00`;
-      fechaFin = `${hasta}T23:59:59`;
+      fechaInicio = inicioDia(desde);
+      fechaFin = finDia(hasta);
       fechaActual = `${desde} a ${hasta}`;
     } else if (fecha) {
-      fechaInicio = `${fecha}T00:00:00`;
-      fechaFin = `${fecha}T23:59:59`;
+      fechaInicio = inicioDia(fecha);
+      fechaFin = finDia(fecha);
     } else {
-      const hoy = new Date().toISOString().split('T')[0];
-      fechaInicio = `${hoy}T00:00:00`;
-      fechaFin = `${hoy}T23:59:59`;
+      const hoy = fechaHoyColombia();
+      fechaInicio = inicioDia(hoy);
+      fechaFin = finDia(hoy);
       fechaActual = hoy;
     }
 

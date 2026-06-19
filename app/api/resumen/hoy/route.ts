@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { inicioDia, finDia, fechaHoyColombia } from '@/lib/fechas';
 
 export async function GET(request: Request) {
   try {
@@ -9,9 +10,9 @@ export async function GET(request: Request) {
 
     const supabase = supabaseAdmin;
 
-    const hoy = new Date();
-    const startOfDay = `${hoy.toISOString().split('T')[0]}T00:00:00`;
-    const endOfDay = `${hoy.toISOString().split('T')[0]}T23:59:59`;
+    const hoy = fechaHoyColombia();
+    const startOfDay = inicioDia(hoy);
+    const endOfDay = finDia(hoy);
 
     const { count: fiadosHoy } = await supabase
       .from('fiados')

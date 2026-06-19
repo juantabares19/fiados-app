@@ -1,50 +1,37 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { inicioDia, finDia, fechaHoyColombia, anioMesColombia, fechaYMD } from '@/lib/fechas';
 
-function getPeriodDates(tipo: string, desde?: string, hasta?: string) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+// Devuelve el rango como fechas 'YYYY-MM-DD' en hora de Colombia. El llamador
+// las convierte a límites de día con inicioDia()/finDia().
+function getPeriodDates(tipo: string, desde?: string, hasta?: string): { desde: string; hasta: string; label: string } {
+  const { anio, mes } = anioMesColombia();
+  const etiquetaMes = (a: number, m: number) =>
+    new Date(Date.UTC(a, m, 1)).toLocaleDateString('es-CO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   switch (tipo) {
-    case 'mes_actual': {
-      const desde = new Date(year, month, 1);
-      const hasta = new Date(year, month + 1, 0);
-      return { desde, hasta, label: now.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }) };
-    }
     case 'mes_anterior': {
-      const prevMonth = month === 0 ? 11 : month - 1;
-      const prevYear = month === 0 ? year - 1 : year;
-      const desde = new Date(prevYear, prevMonth, 1);
-      const hasta = new Date(prevYear, prevMonth + 1, 0);
-      return { desde, hasta, label: new Date(prevYear, prevMonth, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }) };
+      const pm = mes === 0 ? 11 : mes - 1;
+      const py = mes === 0 ? anio - 1 : anio;
+      return { desde: fechaYMD(py, pm, 1), hasta: fechaYMD(py, pm + 1, 0), label: etiquetaMes(py, pm) };
     }
-    case 'ultimos_30': {
-      const hasta = new Date(year, month + 1, 0);
-      const desde = new Date(hasta);
-      desde.setDate(desde.getDate() - 29);
-      return { desde, hasta, label: 'Últimos 30 días' };
-    }
+    case 'ultimos_30':
     case 'ultimos_90': {
-      const hasta = new Date(year, month + 1, 0);
-      const desde = new Date(hasta);
-      desde.setDate(desde.getDate() - 89);
-      return { desde, hasta, label: 'Últimos 90 días' };
+      const dias = tipo === 'ultimos_30' ? 30 : 90;
+      const hoy = fechaHoyColombia();
+      const [hy, hm, hd] = hoy.split('-').map(Number);
+      return { desde: fechaYMD(hy, hm - 1, hd - (dias - 1)), hasta: hoy, label: `Últimos ${dias} días` };
     }
     case 'personalizado': {
       if (!desde || !hasta) {
         throw new Error('Se requiere desde y hasta para periodo personalizado');
       }
-      const desdeDate = new Date(desde);
-      const hastaDate = new Date(hasta);
-      return { desde: desdeDate, hasta: hastaDate, label: `${desde} al ${hasta}` };
+      return { desde, hasta, label: `${desde} al ${hasta}` };
     }
-    default: {
-      const desde = new Date(year, month, 1);
-      const hasta = new Date(year, month + 1, 0);
-      return { desde, hasta, label: now.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }) };
-    }
+    case 'mes_actual':
+    default:
+      return { desde: fechaYMD(anio, mes, 1), hasta: fechaYMD(anio, mes + 1, 0), label: etiquetaMes(anio, mes) };
   }
 }
 
@@ -68,21 +55,23 @@ export async function GET(request: Request) {
 
     const supabase = supabaseAdmin;
 
-    const desdeStr = periodoInfo.desde.toISOString().split('T')[0];
-    const hastaStr = periodoInfo.hasta.toISOString();
+    const desdeStr = periodoInfo.desde;
+    const hastaStr = periodoInfo.hasta;
+    const desdeFiltro = inicioDia(desdeStr);
+    const hastaFiltro = finDia(hastaStr);
 
     const fiadosPromises = await Promise.all([
       supabase
         .from('fiados')
         .select('id, total, created_at, cliente_id')
-        .gte('created_at', desdeStr)
-        .lte('created_at', hastaStr),
+        .gte('created_at', desdeFiltro)
+        .lte('created_at', hastaFiltro),
 
       supabase
         .from('abonos')
         .select('id, monto, metodo_pago, created_at')
-        .gte('created_at', desdeStr)
-        .lte('created_at', hastaStr),
+        .gte('created_at', desdeFiltro)
+        .lte('created_at', hastaFiltro),
 
       supabase
         .from('saldos_clientes')
@@ -225,7 +214,7 @@ export async function GET(request: Request) {
       periodo: {
         tipo: periodoTipo,
         desde: desdeStr,
-        hasta: hastaStr.split('T')[0],
+        hasta: hastaStr,
         label: periodoInfo.label
       },
       fiados: {
