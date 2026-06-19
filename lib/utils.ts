@@ -47,6 +47,16 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
 
+/**
+ * Sanea texto de búsqueda antes de interpolarlo en filtros PostgREST (.or()/.ilike()).
+ * Elimina caracteres con significado especial: la coma separa condiciones, los
+ * paréntesis agrupan, y * / % son comodines. Sin esto, un valor como
+ * "x,estado.eq.bloqueado" inyectaría condiciones al filtro.
+ */
+export function sanitizarBusqueda(texto: string): string {
+  return texto.replace(/[,()*%\\]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export interface EstadoMoraResult {
   estado: 'al_dia' | 'moroso' | 'critico';
   label: string;

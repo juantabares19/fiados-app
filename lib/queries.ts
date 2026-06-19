@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
+import { sanitizarBusqueda } from '@/lib/utils';
 import type { ClienteConSaldo } from '@/lib/types';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
@@ -15,8 +16,9 @@ export async function getClientes(buscar?: string, filtro?: string): Promise<Cli
     query = query.eq('estado', 'activo');
   }
 
-  if (buscar?.trim()) {
-    const searchTerm = `%${buscar.trim()}%`;
+  const buscarLimpio = buscar ? sanitizarBusqueda(buscar) : '';
+  if (buscarLimpio) {
+    const searchTerm = `%${buscarLimpio}%`;
     query = query.or(`nombre.ilike.${searchTerm},apodo.ilike.${searchTerm}`);
   }
 

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { sanitizarBusqueda } from '@/lib/utils';
+import { esNumeroPositivo } from '@/lib/validation';
+import { CREDITO_DEFAULT } from '@/lib/constants';
 
 export async function GET(request: Request) {
   try {
@@ -26,8 +29,9 @@ export async function GET(request: Request) {
       query = query.eq('estado', 'activo');
     }
 
-    if (buscar && buscar.trim()) {
-      const searchTerm = `%${buscar.trim()}%`;
+    const buscarLimpio = buscar ? sanitizarBusqueda(buscar) : '';
+    if (buscarLimpio) {
+      const searchTerm = `%${buscarLimpio}%`;
       query = query.or(`nombre.ilike.${searchTerm},apodo.ilike.${searchTerm}`);
     }
 
@@ -108,9 +112,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const topeFinal = usuario.rol === 'dueño'
-      ? (tope_credito && tope_credito > 0 ? tope_credito : 50000)
-      : 50000;
+    const topeFinal = usuario.rol === 'dueño' && esNumeroPositivo(tope_credito)
+      ? tope_credito
+      : CREDITO_DEFAULT;
 
     const { data: cliente, error } = await supabase
       .from('clientes')
