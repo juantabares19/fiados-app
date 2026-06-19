@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { deleteSessionCookie, verifyToken } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
+    const token = (await cookies()).get('session_token')?.value;
     if (token) {
       const payload = await verifyToken(token);
       if (payload) {

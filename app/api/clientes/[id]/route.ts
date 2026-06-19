@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
 
     const { id } = await params;
@@ -91,7 +91,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 
@@ -193,7 +193,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 

@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
-import { esNumeroPositivo, CANTIDAD_MAX } from '@/lib/validation';
+import { esNumeroPositivo, CANTIDAD_MAX, parseEntero } from '@/lib/validation';
 import { inicioDia, finDia } from '@/lib/fechas';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 
@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     const hasta = searchParams.get('hasta');
     const pageParam = searchParams.get('page');
     const usePagination = pageParam !== null;
-    const page = Math.max(1, parseInt(pageParam || '1'));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || String(QUERY_LIMIT_DEFAULT))));
+    const page = Math.max(1, parseEntero(pageParam, 1));
+    const limit = Math.min(100, Math.max(1, parseEntero(searchParams.get('limit'), QUERY_LIMIT_DEFAULT)));
     const offset = (page - 1) * limit;
 
     const supabase = supabaseAdmin;
@@ -123,7 +123,7 @@ function puedeCancelarFiado(
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 

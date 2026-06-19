@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
 import { inicioDia, finDia } from '@/lib/fechas';
+import { parseEntero } from '@/lib/validation';
 import type { UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 
@@ -17,8 +18,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'cliente_id es requerido' }, { status: 400 });
     }
 
-    const limite = parseInt(searchParams.get('limite') || '50');
-    const pagina = parseInt(searchParams.get('pagina') || '1');
+    const limite = Math.min(100, Math.max(1, parseEntero(searchParams.get('limite'), 50)));
+    const pagina = Math.max(1, parseEntero(searchParams.get('pagina'), 1));
     const tipo = searchParams.get('tipo');
     const desde = searchParams.get('desde');
     const hasta = searchParams.get('hasta');

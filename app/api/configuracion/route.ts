@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
 
     const supabase = supabaseAdmin;
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 

@@ -3,9 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
 import { inicioDia, finDia, fechaHoyColombia } from '@/lib/fechas';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
 
     const supabase = supabaseAdmin;

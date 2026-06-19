@@ -16,3 +16,9 @@ export function esNumeroPositivo(v: unknown, max = MONTO_MAX): v is number {
 export function esNumeroNoNegativo(v: unknown, max = MONTO_MAX): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max;
 }
+
+/** Parsea un entero en base 10 desde un query param; devuelve el default si es inválido (NaN). */
+export function parseEntero(valor: string | null | undefined, porDefecto: number): number {
+  const n = parseInt(valor ?? '', 10);
+  return Number.isFinite(n) ? n : porDefecto;
+}

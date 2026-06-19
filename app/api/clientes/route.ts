@@ -7,7 +7,7 @@ import { CREDITO_DEFAULT } from '@/lib/constants';
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
 
     const { searchParams } = new URL(request.url);
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireUser(request);
+    const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 

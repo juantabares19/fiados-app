@@ -3,9 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
 import { DIAS_MORA_ALERTA, DIAS_MORA_CRITICO } from '@/lib/constants';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const auth = await requireUser(request, { rol: 'dueño' });
+    const auth = await requireUser({ rol: 'dueño' });
     if ('error' in auth) return auth.error;
 
     const supabase = supabaseAdmin;

@@ -7,7 +7,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireUser(request, { rol: 'dueño' });
+    const auth = await requireUser({ rol: 'dueño' });
     if ('error' in auth) return auth.error;
     const { usuario } = auth;
 

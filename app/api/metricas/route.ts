@@ -37,7 +37,7 @@ function getPeriodDates(tipo: string, desde?: string, hasta?: string): { desde: 
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireUser(request, { rol: 'dueño' });
+    const auth = await requireUser({ rol: 'dueño' });
     if ('error' in auth) return auth.error;
 
     const { searchParams } = new URL(request.url);

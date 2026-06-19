@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { verifyToken, type UsuarioPayload } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
 type AuthOk = { usuario: UsuarioPayload };
 type AuthErr = { error: NextResponse };
-
-function getSessionToken(request: Request): string | null {
-  const cookieHeader = request.headers.get('cookie');
-  if (!cookieHeader) return null;
-  // Tolera valores con '=' (base64) y espacios; toma solo la cookie session_token.
-  const match = cookieHeader.match(/(?:^|;\s*)session_token=([^;]+)/);
-  return match ? match[1] : null;
-}
 
 /**
  * Verifica la sesión en CADA request de la API:
@@ -22,16 +15,15 @@ function getSessionToken(request: Request): string | null {
  *  3. (Opcional) rol requerido.
  *
  * Uso:
- *   const auth = await requireUser(request);            // cualquier rol
- *   const auth = await requireUser(request, { rol: 'dueño' });
+ *   const auth = await requireUser();            // cualquier rol
+ *   const auth = await requireUser({ rol: 'dueño' });
  *   if ('error' in auth) return auth.error;
  *   const { usuario } = auth;
  */
 export async function requireUser(
-  request: Request,
   opts?: { rol?: 'dueño' }
 ): Promise<AuthOk | AuthErr> {
-  const token = getSessionToken(request);
+  const token = (await cookies()).get('session_token')?.value;
   if (!token) {
     return { error: NextResponse.json({ error: 'No autorizado' }, { status: 401 }) };
   }
