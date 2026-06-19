@@ -29,7 +29,11 @@ function NuevoAbonoContent() {
   const nombreTienda = config?.nombre_tienda ?? 'Mi Tienda';
 
   const [paso, setPaso] = useState(1);
-  const [clientePreseleccionadoId, setClientePreseleccionadoId] = useState<string | null>(null);
+  // Inicializado desde la URL para evitar un parpadeo del buscador antes de que
+  // el useEffect cargue al cliente preseleccionado.
+  const [clientePreseleccionadoId, setClientePreseleccionadoId] = useState<string | null>(
+    () => searchParams.get('cliente')
+  );
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteConSaldo | null>(null);
   const [monto, setMonto] = useState('');
   const [metodoPago, setMetodoPago] = useState('efectivo');
@@ -54,9 +58,13 @@ function NuevoAbonoContent() {
         const data = await response.json();
         setClienteSeleccionado(data);
         setPaso(2);
+      } else {
+        // No se pudo cargar: caer al buscador en vez de quedar en pantalla de carga.
+        setClientePreseleccionadoId(null);
       }
     } catch (err) {
       console.error('Error al cargar cliente:', err);
+      setClientePreseleccionadoId(null);
     }
   };
 
@@ -122,6 +130,7 @@ function NuevoAbonoContent() {
 
   const reiniciar = () => {
     setPaso(1);
+    setClientePreseleccionadoId(null);
     setClienteSeleccionado(null);
     setMonto('');
     setMetodoPago('efectivo');
@@ -131,7 +140,30 @@ function NuevoAbonoContent() {
     setClienteAlDia(false);
   };
 
-  if (paso === 1 || clientePreseleccionadoId) {
+  // Llegamos con ?cliente= y aún estamos cargando sus datos: mostrar carga, no el buscador.
+  if (clientePreseleccionadoId && !clienteSeleccionado) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Registrar Abono</h1>
+        </div>
+        <div className="flex justify-center py-12">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+        <p className="text-center text-gray-500">Cargando cliente...</p>
+      </div>
+    );
+  }
+
+  if (paso === 2 && clienteSeleccionado && saldoActual <= 0) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -146,10 +178,16 @@ function NuevoAbonoContent() {
           <h1 className="text-2xl font-bold text-gray-900">Registrar Abono</h1>
         </div>
 
-        <SelectorCliente
-          onSeleccionar={seleccionarCliente}
-          clientePreseleccionadoId={clientePreseleccionadoId || undefined}
-        />
+        <Card className="p-6 text-center space-y-3">
+          <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+            <span className="text-3xl">✅</span>
+          </div>
+          <p className="font-semibold text-lg text-gray-900">{clienteSeleccionado.nombre}</p>
+          <p className="text-gray-600">Este cliente no tiene saldo pendiente. No hay nada que abonar.</p>
+          <Button variant="outline" className="w-full h-12" onClick={() => router.back()}>
+            Volver
+          </Button>
+        </Card>
       </div>
     );
   }
@@ -347,7 +385,24 @@ function NuevoAbonoContent() {
     );
   }
 
-  return null;
+  // Paso 1: sin cliente preseleccionado, buscar y elegir.
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => router.back()}
+          className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900">Registrar Abono</h1>
+      </div>
+
+      <SelectorCliente onSeleccionar={seleccionarCliente} />
+    </div>
+  );
 }
 
 export default function NuevoAbonoPage() {
