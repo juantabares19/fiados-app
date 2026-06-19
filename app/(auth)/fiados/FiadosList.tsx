@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUsuario } from '@/hooks/useUsuario';
 import { Button } from '@/components/ui/Button';
@@ -25,11 +25,25 @@ export function FiadosList({ initialFiados }: FiadosListProps) {
   const [fiados, setFiados] = useState<FiadoRaw[]>(initialFiados);
   const [fiadoACancelar, setFiadoACancelar] = useState<FiadoRaw | null>(null);
   const [cancelando, setCancelando] = useState(false);
+  const usuarioInteractuo = useRef(false);
   const router = useRouter();
   const { usuario, esDueño } = useUsuario();
 
+  // Refresco silencioso al montar: initialFiados puede venir del cache de la
+  // pagina, asi que un fiado recien registrado podria no aparecer.
+  useEffect(() => {
+    let activo = true;
+    fetch('/api/fiados', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      // No pisar la lista si el usuario ya cancelo un fiado (evita re-agregarlo).
+      .then((data) => { if (activo && !usuarioInteractuo.current) setFiados(data); })
+      .catch(() => {});
+    return () => { activo = false; };
+  }, []);
+
   const handleCancelarFiado = useCallback(async () => {
     if (!fiadoACancelar) return;
+    usuarioInteractuo.current = true;
     setCancelando(true);
     try {
       const response = await fetch(`/api/fiados/${fiadoACancelar.id}`, { method: 'DELETE' });

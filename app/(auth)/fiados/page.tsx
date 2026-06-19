@@ -3,6 +3,9 @@ import { getFiados } from '@/lib/queries';
 import { FiadosList } from './FiadosList';
 import { Card } from '@/components/ui/Card';
 
+// Datos financieros: nunca servir una lista cacheada (cambia con cada fiado nuevo).
+export const dynamic = 'force-dynamic';
+
 function FiadosLoadingFallback() {
   return (
     <div className="space-y-3">
