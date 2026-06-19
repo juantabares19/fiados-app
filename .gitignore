@@ -42,3 +42,7 @@ next-env.d.ts
 
 # supabase
 supabase/.temp/
+
+# guías internas para agentes (no versionar en el repo público)
+CLAUDE.md
+AGENTS.md
