@@ -12,8 +12,10 @@ import { formatearMoneda } from '@/lib/utils';
 
 interface ProductoForm {
   producto: string;
-  cantidad: number;
-  valor_unitario: number;
+  // Se guardan como texto para permitir edición libre (borrar el campo, etc.);
+  // se convierten a número al calcular el total y al enviar.
+  cantidad: string;
+  valor_unitario: string;
 }
 
 function NuevoFiadoContent() {
@@ -28,7 +30,7 @@ function NuevoFiadoContent() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteConSaldo | null>(null);
   const [quienPidio, setQuienPidio] = useState<'cliente' | 'familiar'>('cliente');
   const [familiar, setFamiliar] = useState('');
-  const [productos, setProductos] = useState<ProductoForm[]>([{ producto: '', cantidad: 1, valor_unitario: 0 }]);
+  const [productos, setProductos] = useState<ProductoForm[]>([{ producto: '', cantidad: '1', valor_unitario: '' }]);
   const [nota, setNota] = useState('');
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -73,7 +75,7 @@ function NuevoFiadoContent() {
   };
 
   const agregarProducto = () => {
-    setProductos([...productos, { producto: '', cantidad: 1, valor_unitario: 0 }]);
+    setProductos([...productos, { producto: '', cantidad: '1', valor_unitario: '' }]);
   };
 
   const eliminarProducto = (index: number) => {
@@ -81,13 +83,13 @@ function NuevoFiadoContent() {
     setProductos(productos.filter((_, i) => i !== index));
   };
 
-  const actualizarProducto = (index: number, campo: keyof ProductoForm, valor: string | number) => {
+  const actualizarProducto = (index: number, campo: keyof ProductoForm, valor: string) => {
     const nuevos = [...productos];
     nuevos[index] = { ...nuevos[index], [campo]: valor };
     setProductos(nuevos);
   };
 
-  const total = productos.reduce((sum, p) => sum + (p.cantidad * p.valor_unitario), 0);
+  const total = productos.reduce((sum, p) => sum + ((Number(p.cantidad) || 0) * (Number(p.valor_unitario) || 0)), 0);
   const nuevoSaldo = clienteSeleccionado ? clienteSeleccionado.saldo + total : 0;
   const disponible = clienteSeleccionado ? clienteSeleccionado.tope_credito - clienteSeleccionado.saldo : 0;
   const superaTope = nuevoSaldo > (clienteSeleccionado?.tope_credito || 0);
@@ -95,7 +97,7 @@ function NuevoFiadoContent() {
   const handleConfirmar = async () => {
     setError('');
 
-    const productosValidos = productos.filter(p => p.producto.trim() !== '' && p.cantidad > 0 && p.valor_unitario > 0);
+    const productosValidos = productos.filter(p => p.producto.trim() !== '' && Number(p.cantidad) > 0 && Number(p.valor_unitario) > 0);
     if (productosValidos.length === 0) {
       setError('Agrega al menos un producto');
       return;
@@ -124,8 +126,8 @@ function NuevoFiadoContent() {
           nota: nota.trim() || null,
           productos: productosValidos.map(p => ({
             producto: p.producto.trim(),
-            cantidad: p.cantidad,
-            valor_unitario: p.valor_unitario,
+            cantidad: Number(p.cantidad),
+            valor_unitario: Number(p.valor_unitario),
           })),
         }),
       });
@@ -149,7 +151,7 @@ function NuevoFiadoContent() {
     setClienteSeleccionado(null);
     setQuienPidio('cliente');
     setFamiliar('');
-    setProductos([{ producto: '', cantidad: 1, valor_unitario: 0 }]);
+    setProductos([{ producto: '', cantidad: '1', valor_unitario: '' }]);
     setNota('');
     setError('');
     setClientePreseleccionadoId(null);
@@ -291,7 +293,7 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
                       type="tel"
                       inputMode="numeric"
                       value={prod.cantidad}
-                      onChange={(e) => actualizarProducto(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      onChange={(e) => actualizarProducto(index, 'cantidad', e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
                     />
                   </div>
@@ -300,16 +302,16 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
                     <input
                       type="tel"
                       inputMode="numeric"
-                      value={prod.valor_unitario || ''}
-                      onChange={(e) => actualizarProducto(index, 'valor_unitario', parseInt(e.target.value) || 0)}
+                      value={prod.valor_unitario}
+                      onChange={(e) => actualizarProducto(index, 'valor_unitario', e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
                       placeholder="$"
                     />
                   </div>
                 </div>
-                {prod.cantidad > 0 && prod.valor_unitario > 0 && (
+                {Number(prod.cantidad) > 0 && Number(prod.valor_unitario) > 0 && (
                   <p className="text-right text-sm text-gray-500 mt-1">
-                    Subtotal: {formatearMoneda(prod.cantidad * prod.valor_unitario)}
+                    Subtotal: {formatearMoneda(Number(prod.cantidad) * Number(prod.valor_unitario))}
                   </p>
                 )}
               </div>
@@ -525,7 +527,7 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
                       type="tel"
                       inputMode="numeric"
                       value={prod.cantidad}
-                      onChange={(e) => actualizarProducto(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      onChange={(e) => actualizarProducto(index, 'cantidad', e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
                     />
                   </div>
@@ -534,16 +536,16 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
                     <input
                       type="tel"
                       inputMode="numeric"
-                      value={prod.valor_unitario || ''}
-                      onChange={(e) => actualizarProducto(index, 'valor_unitario', parseInt(e.target.value) || 0)}
+                      value={prod.valor_unitario}
+                      onChange={(e) => actualizarProducto(index, 'valor_unitario', e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base"
                       placeholder="$"
                     />
                   </div>
                 </div>
-                {prod.cantidad > 0 && prod.valor_unitario > 0 && (
+                {Number(prod.cantidad) > 0 && Number(prod.valor_unitario) > 0 && (
                   <p className="text-right text-sm text-gray-500 mt-1">
-                    Subtotal: {formatearMoneda(prod.cantidad * prod.valor_unitario)}
+                    Subtotal: {formatearMoneda(Number(prod.cantidad) * Number(prod.valor_unitario))}
                   </p>
                 )}
               </div>
