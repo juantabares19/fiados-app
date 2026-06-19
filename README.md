@@ -11,7 +11,7 @@ PWA para digitalizar el proceso de fiados (crédito informal) de una tienda de b
 - **UI**: Tailwind CSS (mobile-first), sin librerías de componentes externas
 - **Lenguaje**: TypeScript
 
-> Para el detalle de arquitectura (flujo de auth, vistas de saldos, RPCs atómicos, etc.) ver **`CLAUDE.md`** y **`AGENTS.md`**.
+> El detalle de arquitectura (flujo de auth, vistas de saldos, RPCs atómicos, etc.) y las notas internas (p. ej. planes de migración bajo `docs/`) viven en guías internas — `CLAUDE.md`, `AGENTS.md` y `docs/` — que **no se versionan en el repo público**.
 
 ## Requisitos
 
