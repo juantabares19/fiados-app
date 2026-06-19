@@ -1,27 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get('cliente_id');
@@ -136,22 +123,9 @@ function puedeCancelarFiado(
 
 export async function POST(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     const body = await request.json();
     const { cliente_id, quien_pidio, familiar, nota, productos } = body;
@@ -185,108 +159,76 @@ export async function POST(request: Request) {
 
     const supabase = supabaseAdmin;
 
-    const { data: cliente, error: clienteError } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('id', cliente_id)
-      .single();
+    // Operación atómica: valida tope e inserta fiado+detalle+auditoría bajo un
+    // lock de la fila del cliente. Cierra la race condition de double-spending.
+    const { data, error } = await supabase.rpc('crear_fiado', {
+      p_cliente_id: cliente_id,
+      p_usuario_id: usuario.id,
+      p_quien_pidio: quien_pidio || 'cliente',
+      p_familiar: familiar ?? null,
+      p_nota: nota ?? null,
+      p_productos: productos,
+    });
 
-    if (clienteError || !cliente) {
-      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
-    }
-
-    if (cliente.estado === 'bloqueado') {
-      return NextResponse.json(
-        { error: 'Este cliente está bloqueado y no puede fiar' },
-        { status: 400 }
-      );
-    }
-
-    const productosConSubtotal = productos.map((p: { producto: string; cantidad: number; valor_unitario: number }) => ({
-      producto: p.producto.trim(),
-      cantidad: p.cantidad,
-      valor_unitario: p.valor_unitario,
-      subtotal: p.cantidad * p.valor_unitario,
-    }));
-
-    const total = productosConSubtotal.reduce((sum: number, p: { subtotal: number }) => sum + p.subtotal, 0);
-
-    const { data: saldos } = await supabase
-      .from('saldos_clientes')
-      .select('saldo, tope_credito')
-      .eq('id', cliente_id)
-      .single();
-
-    const saldoActual = saldos?.saldo || 0;
-    const tope = cliente.tope_credito;
-    const nuevoSaldo = saldoActual + total;
-
-    if (nuevoSaldo > tope) {
-      const disponible = tope - saldoActual;
-      return NextResponse.json({
-        error: `Este fiado supera el tope de crédito. Saldo actual: $${saldoActual.toLocaleString('es-CO')}. Tope: $${tope.toLocaleString('es-CO')}. Disponible: $${disponible.toLocaleString('es-CO')}`,
-      }, { status: 400 });
-    }
-
-    const { data: fiado, error: fiadoError } = await supabase
-      .from('fiados')
-      .insert({
-        cliente_id,
-        usuario_id: usuario.id,
-        quien_pidio: quien_pidio || 'cliente',
-        familiar: familiar?.trim() || null,
-        nota: nota?.trim() || null,
-        total,
-      })
-      .select()
-      .single();
-
-    if (fiadoError || !fiado) {
-      console.error('Error creating fiado:', fiadoError);
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('CLIENTE_NO_ENCONTRADO')) {
+        return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
+      }
+      if (msg.includes('CLIENTE_BLOQUEADO')) {
+        return NextResponse.json({ error: 'Este cliente está bloqueado y no puede fiar' }, { status: 400 });
+      }
+      if (msg.includes('TOPE_EXCEDIDO')) {
+        const m = msg.match(/TOPE_EXCEDIDO\|([^|]+)\|([^|]+)\|([^|\s]+)/);
+        const saldoActual = Number(m?.[1] ?? 0);
+        const tope = Number(m?.[2] ?? 0);
+        const disponible = Number(m?.[3] ?? 0);
+        return NextResponse.json({
+          error: `Este fiado supera el tope de crédito. Saldo actual: $${saldoActual.toLocaleString('es-CO')}. Tope: $${tope.toLocaleString('es-CO')}. Disponible: $${disponible.toLocaleString('es-CO')}`,
+        }, { status: 400 });
+      }
+      if (msg.includes('SIN_PRODUCTOS')) {
+        return NextResponse.json({ error: 'Al menos un producto es requerido' }, { status: 400 });
+      }
+      if (msg.includes('FAMILIAR_REQUERIDO')) {
+        return NextResponse.json({ error: 'El nombre del familiar es requerido' }, { status: 400 });
+      }
+      if (msg.includes('PRODUCTO_SIN_NOMBRE')) {
+        return NextResponse.json({ error: 'Todos los productos deben tener nombre' }, { status: 400 });
+      }
+      if (msg.includes('CANTIDAD_INVALIDA')) {
+        return NextResponse.json({ error: 'La cantidad debe ser mayor a 0' }, { status: 400 });
+      }
+      if (msg.includes('VALOR_INVALIDO')) {
+        return NextResponse.json({ error: 'El valor unitario debe ser mayor a 0' }, { status: 400 });
+      }
+      console.error('Error RPC crear_fiado:', error);
       return NextResponse.json({ error: 'Error al crear fiado' }, { status: 500 });
     }
 
-    const detallesParaInsert = productosConSubtotal.map((p: { producto: string; cantidad: number; valor_unitario: number; subtotal: number }) => ({
-      fiado_id: fiado.id,
-      producto: p.producto,
-      cantidad: p.cantidad,
-      valor_unitario: p.valor_unitario,
-      subtotal: p.subtotal,
-    }));
-
-    const { error: detallesError } = await supabase
-      .from('fiado_detalle')
-      .insert(detallesParaInsert);
-
-    if (detallesError) {
-      console.error('Error creating detalles:', detallesError);
-      await supabase.from('fiados').delete().eq('id', fiado.id);
-      return NextResponse.json({ error: 'Error al crear productos del fiado' }, { status: 500 });
-    }
-
-    await supabase.from('auditoria').insert({
-      tabla: 'fiados',
-      registro_id: fiado.id,
-      accion: 'crear',
-      usuario_id: usuario.id,
-      datos_despues: fiado,
-    });
+    const result = data as {
+      fiado: { id: string; cliente_id: string; usuario_id: string; quien_pidio: string; familiar: string | null; nota: string | null; total: number; created_at: string };
+      cliente_nombre: string;
+      nuevo_saldo: number;
+      tope: number;
+      disponible: number;
+    };
 
     const { data: detalles } = await supabase
       .from('fiado_detalle')
       .select('id, producto, cantidad, valor_unitario, subtotal')
-      .eq('fiado_id', fiado.id);
+      .eq('fiado_id', result.fiado.id);
 
     return NextResponse.json({
       fiado: {
-        ...fiado,
-        cliente_nombre: cliente.nombre,
+        ...result.fiado,
+        cliente_nombre: result.cliente_nombre,
         usuario_nombre: usuario.nombre,
         detalles: detalles || [],
       },
-      nuevo_saldo: nuevoSaldo,
-      tope,
-      disponible: tope - nuevoSaldo,
+      nuevo_saldo: result.nuevo_saldo,
+      tope: result.tope,
+      disponible: result.disponible,
     }, { status: 201 });
   } catch (error) {
     console.error('POST /api/fiados error:', error);

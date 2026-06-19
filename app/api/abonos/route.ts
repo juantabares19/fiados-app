@@ -1,29 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
-import type { UsuarioRelacion } from '@/lib/database.types';
 
 const METODOS_PAGO = ['efectivo', 'nequi', 'daviplata', 'llaves', 'otro'];
 
 export async function GET(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
 
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get('cliente_id');
@@ -88,7 +73,7 @@ export async function GET(request: Request) {
       id: abono.id,
       cliente_id: abono.cliente_id,
       cliente_nombre: clientesMap[abono.cliente_id] || '',
-      usuario_id: (abono as any).usuario_id ?? '',
+      usuario_id: abono.usuario_id ?? '',
       usuario_nombre: (abono.usuarios as unknown as { nombre: string } | null)?.nombre ?? '',
       monto: abono.monto,
       metodo_pago: abono.metodo_pago,
@@ -120,22 +105,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     const body = await request.json();
     const { cliente_id, monto, metodo_pago, nota } = body;
@@ -157,84 +129,62 @@ export async function POST(request: Request) {
 
     const supabase = supabaseAdmin;
 
-    const { data: cliente, error: clienteError } = await supabase
-      .from('clientes')
-      .select('id, nombre')
-      .eq('id', cliente_id)
-      .single();
+    // Operación atómica: valida saldo e inserta abono+auditoría bajo un lock de
+    // la fila del cliente. Cierra la race condition de sobrepago (saldo negativo).
+    const { data, error } = await supabase.rpc('crear_abono', {
+      p_cliente_id: cliente_id,
+      p_usuario_id: usuario.id,
+      p_monto: monto,
+      p_metodo_pago: metodo_pago,
+      p_nota: nota ?? null,
+    });
 
-    if (clienteError || !cliente) {
-      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
-    }
-
-    const { data: saldos } = await supabase
-      .from('saldos_clientes')
-      .select('saldo')
-      .eq('id', cliente_id)
-      .single();
-
-    const saldoActual = saldos?.saldo || 0;
-
-    if (saldoActual === 0) {
-      return NextResponse.json(
-        { error: 'Este cliente no tiene saldo pendiente' },
-        { status: 400 }
-      );
-    }
-
-    if (monto > saldoActual) {
-      return NextResponse.json({
-        error: `El abono ($${monto.toLocaleString('es-CO')}) supera el saldo pendiente ($${saldoActual.toLocaleString('es-CO')})`,
-      }, { status: 400 });
-    }
-
-    const { data: abono, error: abonoError } = await supabase
-      .from('abonos')
-      .insert({
-        cliente_id,
-        usuario_id: usuario.id,
-        monto,
-        metodo_pago,
-        nota: nota?.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (abonoError || !abono) {
-      console.error('Error creating abono:', abonoError);
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('CLIENTE_NO_ENCONTRADO')) {
+        return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
+      }
+      if (msg.includes('MONTO_INVALIDO')) {
+        return NextResponse.json({ error: 'El monto debe ser mayor a 0' }, { status: 400 });
+      }
+      if (msg.includes('METODO_INVALIDO')) {
+        return NextResponse.json({ error: 'Método de pago inválido' }, { status: 400 });
+      }
+      if (msg.includes('SIN_SALDO')) {
+        return NextResponse.json({ error: 'Este cliente no tiene saldo pendiente' }, { status: 400 });
+      }
+      if (msg.includes('ABONO_EXCEDE_SALDO')) {
+        const saldoActual = Number(msg.match(/ABONO_EXCEDE_SALDO\|([^|\s]+)/)?.[1] ?? 0);
+        return NextResponse.json({
+          error: `El abono ($${Number(monto).toLocaleString('es-CO')}) supera el saldo pendiente ($${saldoActual.toLocaleString('es-CO')})`,
+        }, { status: 400 });
+      }
+      console.error('Error RPC crear_abono:', error);
       return NextResponse.json({ error: 'Error al crear abono' }, { status: 500 });
     }
 
-    await supabase.from('auditoria').insert({
-      tabla: 'abonos',
-      registro_id: abono.id,
-      accion: 'crear',
-      usuario_id: usuario.id,
-      datos_despues: abono,
-    });
-
-    const { data: nuevoSaldos } = await supabase
-      .from('saldos_clientes')
-      .select('saldo')
-      .eq('id', cliente_id)
-      .single();
-
-    const nuevoSaldo = nuevoSaldos?.saldo || 0;
+    const result = data as {
+      abono: { id: string; cliente_id: string; monto: number; metodo_pago: string; nota: string | null; created_at: string };
+      cliente_nombre: string;
+      saldo_anterior: number;
+      nuevo_saldo: number;
+      cliente_al_dia: boolean;
+    };
 
     return NextResponse.json({
       abono: {
-        id: abono.id,
-        cliente_id: abono.cliente_id,
-        cliente_nombre: cliente.nombre,
+        id: result.abono.id,
+        cliente_id: result.abono.cliente_id,
+        cliente_nombre: result.cliente_nombre,
         usuario_nombre: usuario.nombre,
-        monto: abono.monto,
-        metodo_pago: abono.metodo_pago,
-        nota: abono.nota,
-        created_at: abono.created_at,
+        monto: result.abono.monto,
+        metodo_pago: result.abono.metodo_pago,
+        nota: result.abono.nota,
+        created_at: result.abono.created_at,
       },
-      saldo_anterior: saldoActual,
-      nuevo_saldo: nuevoSaldo,
-      cliente_al_dia: nuevoSaldo === 0,
+      saldo_anterior: result.saldo_anterior,
+      nuevo_saldo: result.nuevo_saldo,
+      cliente_al_dia: result.cliente_al_dia,
     }, { status: 201 });
   } catch (error) {
     console.error('POST /api/abonos error:', error);
