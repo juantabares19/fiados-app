@@ -15,3 +15,9 @@ export const TOKEN_EXPIRY = '7d';
 
 /** Duración máxima de la cookie de sesión en segundos (7 días) */
 export const COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
+
+/** Intentos de login fallidos consecutivos antes de bloquear temporalmente */
+export const LOGIN_MAX_INTENTOS = 5;
+
+/** Minutos de bloqueo de login tras superar el máximo de intentos */
+export const LOGIN_LOCKOUT_MINUTOS = 15;

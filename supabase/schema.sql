@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
     rol VARCHAR(20) NOT NULL CHECK (rol IN ('dueño', 'tendero')),
     activo BOOLEAN DEFAULT true,
     token_version INTEGER NOT NULL DEFAULT 0,
+    intentos_fallidos INTEGER NOT NULL DEFAULT 0,
+    bloqueado_hasta TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
