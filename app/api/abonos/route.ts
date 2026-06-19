@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
-import { esNumeroPositivo, parseEntero } from '@/lib/validation';
+import { esEnteroPositivo, parseEntero } from '@/lib/validation';
 import { inicioDia, finDia } from '@/lib/fechas';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
 
@@ -116,8 +116,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cliente es requerido' }, { status: 400 });
     }
 
-    if (!esNumeroPositivo(monto)) {
-      return NextResponse.json({ error: 'El monto debe ser un número válido mayor a 0' }, { status: 400 });
+    if (!esEnteroPositivo(monto)) {
+      return NextResponse.json({ error: 'El monto debe ser un número entero mayor a 0' }, { status: 400 });
     }
 
     if (!metodo_pago || !METODOS_PAGO.includes(metodo_pago)) {

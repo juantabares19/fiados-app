@@ -12,6 +12,14 @@ export function esNumeroPositivo(v: unknown, max = MONTO_MAX): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= max;
 }
 
+/**
+ * Es un entero > 0 y <= max. Para dinero/cantidades en COP (sin centavos): exige
+ * enteros para que no haya errores de coma flotante en los cálculos.
+ */
+export function esEnteroPositivo(v: unknown, max = MONTO_MAX): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= max;
+}
+
 /** Es un número real finito, >= 0 y <= max. */
 export function esNumeroNoNegativo(v: unknown, max = MONTO_MAX): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max;
