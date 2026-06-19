@@ -12,11 +12,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
     pin VARCHAR(255) NOT NULL,
     rol VARCHAR(20) NOT NULL CHECK (rol IN ('dueño', 'tendero')),
     activo BOOLEAN DEFAULT true,
+    token_version INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
 COMMENT ON TABLE usuarios IS 'Usuarios que atienden la tienda (dueño o tendero)';
 COMMENT ON COLUMN usuarios.pin IS 'Hash bcrypt del PIN de 4 dígitos';
+COMMENT ON COLUMN usuarios.token_version IS
+  'Se incrementa al hacer logout o desactivar cuenta. Los JWT con versión anterior son rechazados.';
 
 -- ================================================
 -- TABLA: clientes
@@ -26,7 +29,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     nombre VARCHAR(100) NOT NULL,
     apodo VARCHAR(50),
     celular VARCHAR(15) NOT NULL,
-    tope_credito DECIMAL(12,2) NOT NULL DEFAULT 50000,
+    tope_credito DECIMAL(12,2) NOT NULL DEFAULT 50000 CHECK (tope_credito >= 0),
     estado VARCHAR(20) NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo', 'bloqueado')),
     familiares TEXT,
     created_by UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
@@ -45,7 +48,7 @@ CREATE TABLE IF NOT EXISTS fiados (
     quien_pidio VARCHAR(20) NOT NULL DEFAULT 'cliente' CHECK (quien_pidio IN ('cliente', 'familiar')),
     familiar VARCHAR(100),
     nota TEXT,
-    total DECIMAL(12,2) NOT NULL,
+    total DECIMAL(12,2) NOT NULL CHECK (total > 0),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -58,9 +61,9 @@ CREATE TABLE IF NOT EXISTS fiado_detalle (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fiado_id UUID NOT NULL REFERENCES fiados(id) ON DELETE CASCADE,
     producto VARCHAR(150) NOT NULL,
-    cantidad DECIMAL(8,2) NOT NULL DEFAULT 1,
-    valor_unitario DECIMAL(12,2) NOT NULL,
-    subtotal DECIMAL(12,2) NOT NULL
+    cantidad DECIMAL(8,2) NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+    valor_unitario DECIMAL(12,2) NOT NULL CHECK (valor_unitario >= 0),
+    subtotal DECIMAL(12,2) NOT NULL CHECK (subtotal >= 0)
 );
 
 COMMENT ON TABLE fiado_detalle IS 'Productos de cada fiado';
@@ -72,7 +75,7 @@ CREATE TABLE IF NOT EXISTS abonos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cliente_id UUID NOT NULL REFERENCES clientes(id) ON DELETE RESTRICT,
     usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
-    monto DECIMAL(12,2) NOT NULL,
+    monto DECIMAL(12,2) NOT NULL CHECK (monto > 0),
     metodo_pago VARCHAR(20) NOT NULL CHECK (metodo_pago IN ('efectivo', 'nequi', 'daviplata', 'llaves', 'otro')),
     nota TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
@@ -138,6 +141,9 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria(created_at);
 -- ================================================
 -- VISTA: saldos_clientes
 -- ================================================
+-- IMPORTANTE: pre-agregar fiados y abonos por separado ANTES de unir.
+-- Un LEFT JOIN directo a ambas tablas genera un producto cartesiano (M*N filas)
+-- que multiplica los SUM y produce saldos incorrectos.
 CREATE OR REPLACE VIEW saldos_clientes AS
 SELECT
     c.id,
@@ -146,15 +152,48 @@ SELECT
     c.celular,
     c.estado,
     c.tope_credito,
-    COALESCE(SUM(f.total), 0) AS total_fiados,
-    COALESCE(SUM(ab.monto), 0) AS total_abonos,
-    COALESCE(SUM(f.total), 0) - COALESCE(SUM(ab.monto), 0) AS saldo
+    COALESCE(f.total_fiados, 0) AS total_fiados,
+    COALESCE(a.total_abonos, 0) AS total_abonos,
+    COALESCE(f.total_fiados, 0) - COALESCE(a.total_abonos, 0) AS saldo
 FROM clientes c
-LEFT JOIN fiados f ON f.cliente_id = c.id
-LEFT JOIN abonos ab ON ab.cliente_id = c.id
-GROUP BY c.id, c.nombre, c.apodo, c.celular, c.estado, c.tope_credito;
+LEFT JOIN (
+    SELECT cliente_id, SUM(total) AS total_fiados
+    FROM fiados
+    GROUP BY cliente_id
+) f ON f.cliente_id = c.id
+LEFT JOIN (
+    SELECT cliente_id, SUM(monto) AS total_abonos
+    FROM abonos
+    GROUP BY cliente_id
+) a ON a.cliente_id = c.id;
 
-COMMENT ON VIEW saldos_clientes IS 'Calcula el saldo de cada cliente';
+COMMENT ON VIEW saldos_clientes IS 'Saldo por cliente (fiados - abonos). Pre-agrega para evitar fan-out.';
+
+-- ================================================
+-- VISTA: vista_estado_mora
+-- ================================================
+CREATE OR REPLACE VIEW vista_estado_mora AS
+WITH ultimo_movimiento AS (
+  SELECT cliente_id, MAX(created_at) AS ultima_fecha
+  FROM (SELECT cliente_id, created_at FROM fiados
+        UNION ALL SELECT cliente_id, created_at FROM abonos) m
+  GROUP BY cliente_id
+)
+SELECT
+  sc.id,
+  sc.nombre,
+  sc.saldo,
+  COALESCE(EXTRACT(DAY FROM NOW() - um.ultima_fecha)::INTEGER, 9999) AS dias_sin_movimiento,
+  CASE
+    WHEN sc.saldo <= 0 THEN 'al_dia'
+    WHEN COALESCE(EXTRACT(DAY FROM NOW() - um.ultima_fecha)::INTEGER, 9999) >= 30 THEN 'critico'
+    WHEN COALESCE(EXTRACT(DAY FROM NOW() - um.ultima_fecha)::INTEGER, 9999) >= 15 THEN 'moroso'
+    ELSE 'al_dia'
+  END AS estado_mora
+FROM saldos_clientes sc
+LEFT JOIN ultimo_movimiento um ON sc.id = um.cliente_id;
+
+COMMENT ON VIEW vista_estado_mora IS 'Estado de mora de cada cliente basado en días sin movimiento';
 
 -- ================================================
 -- FUNCIONES Y TRIGGERS PARA AUDITORÍA
@@ -217,75 +256,178 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger para clientes
-CREATE OR REPLACE TRIGGER tr_clientes_auditoria
-AFTER INSERT OR UPDATE OR DELETE ON clientes
-FOR EACH ROW EXECUTE FUNCTION registrar_auditoria();
-
--- Trigger para fiados
-CREATE OR REPLACE TRIGGER tr_fiados_auditoria
-AFTER INSERT OR UPDATE OR DELETE ON fiados
-FOR EACH ROW EXECUTE FUNCTION registrar_auditoria();
-
--- Trigger para abonos
-CREATE OR REPLACE TRIGGER tr_abonos_auditoria
-AFTER INSERT OR UPDATE OR DELETE ON abonos
-FOR EACH ROW EXECUTE FUNCTION registrar_auditoria();
+-- NOTA: la auditoría se hace en la capa de aplicación (rutas API y RPCs
+-- crear_fiado/crear_abono insertan en `auditoria` con el usuario real).
+-- Por eso NO se adjuntan triggers a las tablas: hacerlo duplicaría cada
+-- registro de auditoría. La función registrar_auditoria() se conserva por si
+-- en el futuro se migra a auditoría por trigger (requeriría setear
+-- app.current_user_id por request y quitar los inserts manuales).
 
 -- ================================================
--- POLÍTICAS RLS (Row Level Security)
+-- RPCs ATÓMICOS DE DINERO (crear_fiado / crear_abono)
 -- ================================================
+-- Encapsulan validación + inserción + auditoría con SELECT ... FOR UPDATE sobre
+-- la fila del cliente. Serializan operaciones concurrentes del mismo cliente y
+-- evitan double-spending (superar tope) y sobrepago (saldo negativo).
+-- Las rutas POST /api/fiados y /api/abonos llaman estas funciones vía rpc().
 
--- Habilitar RLS en todas las tablas
-ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
-ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE fiados ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION crear_fiado(
+  p_cliente_id  UUID,
+  p_usuario_id  UUID,
+  p_quien_pidio TEXT,
+  p_familiar    TEXT,
+  p_nota        TEXT,
+  p_productos   JSONB  -- [{producto, cantidad, valor_unitario}, ...]
+) RETURNS JSONB
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_cliente clientes%ROWTYPE;
+  v_fiado   fiados%ROWTYPE;
+  v_total   NUMERIC(12,2) := 0;
+  v_saldo   NUMERIC(12,2);
+  v_prod    JSONB;
+  v_cant    NUMERIC;
+  v_vu      NUMERIC;
+BEGIN
+  SELECT * INTO v_cliente FROM clientes WHERE id = p_cliente_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'CLIENTE_NO_ENCONTRADO'; END IF;
+  IF v_cliente.estado = 'bloqueado' THEN RAISE EXCEPTION 'CLIENTE_BLOQUEADO'; END IF;
+
+  IF p_productos IS NULL OR jsonb_typeof(p_productos) <> 'array' OR jsonb_array_length(p_productos) = 0 THEN
+    RAISE EXCEPTION 'SIN_PRODUCTOS';
+  END IF;
+
+  IF COALESCE(NULLIF(p_quien_pidio, ''), 'cliente') = 'familiar'
+     AND COALESCE(btrim(p_familiar), '') = '' THEN
+    RAISE EXCEPTION 'FAMILIAR_REQUERIDO';
+  END IF;
+
+  FOR v_prod IN SELECT * FROM jsonb_array_elements(p_productos) LOOP
+    v_cant := (v_prod->>'cantidad')::NUMERIC;
+    v_vu   := (v_prod->>'valor_unitario')::NUMERIC;
+    IF COALESCE(btrim(v_prod->>'producto'), '') = '' THEN RAISE EXCEPTION 'PRODUCTO_SIN_NOMBRE'; END IF;
+    IF v_cant IS NULL OR v_cant <= 0 THEN RAISE EXCEPTION 'CANTIDAD_INVALIDA'; END IF;
+    IF v_vu   IS NULL OR v_vu   <= 0 THEN RAISE EXCEPTION 'VALOR_INVALIDO'; END IF;
+    v_total := v_total + (v_cant * v_vu);
+  END LOOP;
+
+  SELECT COALESCE(SUM(f.total), 0)
+         - (SELECT COALESCE(SUM(a.monto), 0) FROM abonos a WHERE a.cliente_id = p_cliente_id)
+  INTO v_saldo FROM fiados f WHERE f.cliente_id = p_cliente_id;
+
+  IF v_saldo + v_total > v_cliente.tope_credito THEN
+    RAISE EXCEPTION 'TOPE_EXCEDIDO|%|%|%', v_saldo, v_cliente.tope_credito, (v_cliente.tope_credito - v_saldo);
+  END IF;
+
+  INSERT INTO fiados (cliente_id, usuario_id, quien_pidio, familiar, nota, total)
+  VALUES (
+    p_cliente_id, p_usuario_id,
+    COALESCE(NULLIF(p_quien_pidio, ''), 'cliente'),
+    NULLIF(btrim(COALESCE(p_familiar, '')), ''),
+    NULLIF(btrim(COALESCE(p_nota, '')), ''),
+    v_total
+  )
+  RETURNING * INTO v_fiado;
+
+  INSERT INTO fiado_detalle (fiado_id, producto, cantidad, valor_unitario, subtotal)
+  SELECT v_fiado.id, btrim(p->>'producto'),
+         (p->>'cantidad')::NUMERIC, (p->>'valor_unitario')::NUMERIC,
+         (p->>'cantidad')::NUMERIC * (p->>'valor_unitario')::NUMERIC
+  FROM jsonb_array_elements(p_productos) p;
+
+  INSERT INTO auditoria (tabla, registro_id, accion, usuario_id, datos_despues)
+  VALUES ('fiados', v_fiado.id, 'crear', p_usuario_id, to_jsonb(v_fiado));
+
+  RETURN jsonb_build_object(
+    'fiado',          to_jsonb(v_fiado),
+    'cliente_nombre', v_cliente.nombre,
+    'nuevo_saldo',    v_saldo + v_total,
+    'tope',           v_cliente.tope_credito,
+    'disponible',     v_cliente.tope_credito - (v_saldo + v_total)
+  );
+END $$;
+
+CREATE OR REPLACE FUNCTION crear_abono(
+  p_cliente_id  UUID,
+  p_usuario_id  UUID,
+  p_monto       NUMERIC,
+  p_metodo_pago TEXT,
+  p_nota        TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_cliente clientes%ROWTYPE;
+  v_abono   abonos%ROWTYPE;
+  v_saldo   NUMERIC(12,2);
+BEGIN
+  SELECT * INTO v_cliente FROM clientes WHERE id = p_cliente_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'CLIENTE_NO_ENCONTRADO'; END IF;
+
+  IF p_monto IS NULL OR p_monto <= 0 THEN RAISE EXCEPTION 'MONTO_INVALIDO'; END IF;
+  IF p_metodo_pago NOT IN ('efectivo','nequi','daviplata','llaves','otro') THEN
+    RAISE EXCEPTION 'METODO_INVALIDO';
+  END IF;
+
+  SELECT (SELECT COALESCE(SUM(f.total), 0) FROM fiados f WHERE f.cliente_id = p_cliente_id)
+         - COALESCE(SUM(a.monto), 0)
+  INTO v_saldo FROM abonos a WHERE a.cliente_id = p_cliente_id;
+
+  IF v_saldo <= 0 THEN RAISE EXCEPTION 'SIN_SALDO'; END IF;
+  IF p_monto > v_saldo THEN RAISE EXCEPTION 'ABONO_EXCEDE_SALDO|%', v_saldo; END IF;
+
+  INSERT INTO abonos (cliente_id, usuario_id, monto, metodo_pago, nota)
+  VALUES (p_cliente_id, p_usuario_id, p_monto, p_metodo_pago, NULLIF(btrim(COALESCE(p_nota, '')), ''))
+  RETURNING * INTO v_abono;
+
+  INSERT INTO auditoria (tabla, registro_id, accion, usuario_id, datos_despues)
+  VALUES ('abonos', v_abono.id, 'crear', p_usuario_id, to_jsonb(v_abono));
+
+  RETURN jsonb_build_object(
+    'abono',          to_jsonb(v_abono),
+    'cliente_nombre', v_cliente.nombre,
+    'saldo_anterior', v_saldo,
+    'nuevo_saldo',    v_saldo - p_monto,
+    'cliente_al_dia', (v_saldo - p_monto) = 0
+  );
+END $$;
+
+REVOKE ALL ON FUNCTION crear_fiado(UUID, UUID, TEXT, TEXT, TEXT, JSONB) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION crear_abono(UUID, UUID, NUMERIC, TEXT, TEXT)      FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION crear_fiado(UUID, UUID, TEXT, TEXT, TEXT, JSONB) TO service_role;
+GRANT EXECUTE ON FUNCTION crear_abono(UUID, UUID, NUMERIC, TEXT, TEXT)     TO service_role;
+
+-- ================================================
+-- SEGURIDAD A NIVEL DE BASE DE DATOS (RLS + grants)
+-- ================================================
+-- Esta app NO usa Supabase Auth: TODO el backend opera con SERVICE_ROLE_KEY,
+-- que ignora RLS y conserva sus grants. El anon key es público (viaja al
+-- navegador), así que los roles anon/authenticated deben quedar SIN acceso.
+-- Postura: RLS habilitado + cero políticas + grants revocados = deny-all
+-- para los roles públicos. El backend (service_role) no se ve afectado.
+--
+-- NO crear políticas permisivas "USING (true)": eso deja la BD abierta a
+-- cualquiera con el anon key, saltándose el JWT y la lógica de negocio.
+
+ALTER TABLE usuarios      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clientes      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fiados        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fiado_detalle ENABLE ROW LEVEL SECURITY;
-ALTER TABLE abonos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auditoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE abonos        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auditoria     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
 
--- Políticas para usuarios
-CREATE POLICY "usuarios_select" ON usuarios FOR SELECT USING (true);
-CREATE POLICY "usuarios_insert" ON usuarios FOR INSERT WITH CHECK (true);
-CREATE POLICY "usuarios_update" ON usuarios FOR UPDATE USING (true);
-CREATE POLICY "usuarios_delete" ON usuarios FOR DELETE USING (true);
+-- Revocar todo acceso a los roles públicos.
+REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL ROUTINES  IN SCHEMA public FROM anon, authenticated;
 
--- Políticas para clientes
-CREATE POLICY "clientes_select" ON clientes FOR SELECT USING (true);
-CREATE POLICY "clientes_insert" ON clientes FOR INSERT WITH CHECK (true);
-CREATE POLICY "clientes_update" ON clientes FOR UPDATE USING (true);
-CREATE POLICY "clientes_delete" ON clientes FOR DELETE USING (true);
+-- Las vistas exponen datos aunque las tablas estén cerradas: revocarlas también.
+REVOKE ALL ON saldos_clientes, vista_estado_mora FROM anon, authenticated;
 
--- Políticas para fiados
-CREATE POLICY "fiados_select" ON fiados FOR SELECT USING (true);
-CREATE POLICY "fiados_insert" ON fiados FOR INSERT WITH CHECK (true);
-CREATE POLICY "fiados_update" ON fiados FOR UPDATE USING (true);
-CREATE POLICY "fiados_delete" ON fiados FOR DELETE USING (true);
-
--- Políticas para fiado_detalle
-CREATE POLICY "fiado_detalle_select" ON fiado_detalle FOR SELECT USING (true);
-CREATE POLICY "fiado_detalle_insert" ON fiado_detalle FOR INSERT WITH CHECK (true);
-CREATE POLICY "fiado_detalle_update" ON fiado_detalle FOR UPDATE USING (true);
-CREATE POLICY "fiado_detalle_delete" ON fiado_detalle FOR DELETE USING (true);
-
--- Políticas para abonos
-CREATE POLICY "abonos_select" ON abonos FOR SELECT USING (true);
-CREATE POLICY "abonos_insert" ON abonos FOR INSERT WITH CHECK (true);
-CREATE POLICY "abonos_update" ON abonos FOR UPDATE USING (true);
-CREATE POLICY "abonos_delete" ON abonos FOR DELETE USING (true);
-
--- Políticas para auditoria
-CREATE POLICY "auditoria_select" ON auditoria FOR SELECT USING (true);
-CREATE POLICY "auditoria_insert" ON auditoria FOR INSERT WITH CHECK (true);
-CREATE POLICY "auditoria_update" ON auditoria FOR UPDATE USING (true);
-CREATE POLICY "auditoria_delete" ON auditoria FOR DELETE USING (true);
-
--- Políticas para configuracion
-CREATE POLICY "configuracion_select" ON configuracion FOR SELECT USING (true);
-CREATE POLICY "configuracion_insert" ON configuracion FOR INSERT WITH CHECK (true);
-CREATE POLICY "configuracion_update" ON configuracion FOR UPDATE USING (true);
-CREATE POLICY "configuracion_delete" ON configuracion FOR DELETE USING (true);
+-- Que futuras tablas/funciones nazcan cerradas para los roles públicos.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
 
 -- ================================================
 -- USUARIO DEMO (para testing)
