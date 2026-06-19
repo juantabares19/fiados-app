@@ -3,6 +3,9 @@ import { getClientes } from '@/lib/queries';
 import { ClientesList } from './ClientesList';
 import { Card } from '@/components/ui/Card';
 
+// Datos financieros: nunca servir saldos cacheados (cambian con cada fiado/abono).
+export const dynamic = 'force-dynamic';
+
 function ClientesLoadingFallback() {
   return (
     <div className="space-y-3">

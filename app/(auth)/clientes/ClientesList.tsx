@@ -23,6 +23,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
   const [buscar, setBuscar] = useState('');
   const [filtro, setFiltro] = useState<FiltroClientes>('todos');
   const isFirstRender = useRef(true);
+  const usuarioInteractuo = useRef(false);
   const router = useRouter();
 
   const cargarClientes = useCallback(async (termino: string, fil: FiltroClientes) => {
@@ -32,7 +33,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
       const params = new URLSearchParams();
       if (termino) params.set('buscar', termino);
       if (fil !== 'todos') params.set('filtro', fil);
-      const response = await fetch(`/api/clientes?${params.toString()}`);
+      const response = await fetch(`/api/clientes?${params.toString()}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Error al obtener clientes');
       const data = await response.json();
       setClientes(data);
@@ -44,11 +45,25 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
     }
   }, []);
 
+  // Refresco silencioso al montar: initialClientes puede venir del cache de la
+  // pagina, asi que tras registrar un fiado/abono los saldos cambian. No mostramos
+  // skeleton (mantenemos la lista visible) para evitar parpadeo.
+  useEffect(() => {
+    let activo = true;
+    fetch('/api/clientes', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      // No pisar un filtro/busqueda si el usuario ya empezo a interactuar.
+      .then((data) => { if (activo && !usuarioInteractuo.current) setClientes(data); })
+      .catch(() => {});
+    return () => { activo = false; };
+  }, []);
+
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
+    usuarioInteractuo.current = true;
     const timeoutId = setTimeout(() => {
       cargarClientes(buscar, filtro);
     }, 300);
