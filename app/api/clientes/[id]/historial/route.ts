@@ -1,26 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 import type { UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get('cliente_id');
@@ -89,7 +76,7 @@ export async function GET(request: Request) {
     }> = [];
 
     if (!tipo || tipo === 'fiado') {
-      let queryFiados = supabase
+      const queryFiados = supabase
         .from('fiados')
         .select(`id, total, quien_pidio, familiar, nota, created_at, usuario_id, usuarios!inner(nombre)`)
         .eq('cliente_id', clienteId)

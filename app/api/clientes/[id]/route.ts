@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 import { DIAS_MORA_ALERTA, DIAS_MORA_CRITICO } from '@/lib/constants';
 
 export async function GET(
@@ -8,22 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
 
     const { id } = await params;
     const supabase = supabaseAdmin;
@@ -104,22 +90,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     if (usuario.rol !== 'dueño') {
       return NextResponse.json(
@@ -219,22 +192,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     if (usuario.rol !== 'dueño') {
       return NextResponse.json(

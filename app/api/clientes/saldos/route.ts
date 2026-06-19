@@ -1,25 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
 
     const { searchParams } = new URL(request.url);
     const orden = searchParams.get('orden') || 'deuda';

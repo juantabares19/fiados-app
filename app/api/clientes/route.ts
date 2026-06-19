@@ -1,25 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
 
     const { searchParams } = new URL(request.url);
     const buscar = searchParams.get('buscar');
@@ -54,7 +40,7 @@ export async function GET(request: Request) {
 
     const clienteIds = (clientes || []).map(c => c.id);
 
-    let saldosMap: Record<string, number> = {};
+    const saldosMap: Record<string, number> = {};
     if (clienteIds.length > 0) {
       const { data: saldos } = await supabase
         .from('saldos_clientes')
@@ -86,22 +72,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
+    const auth = await requireUser(request);
+    if ('error' in auth) return auth.error;
+    const { usuario } = auth;
 
     const body = await request.json();
     const { nombre, apodo, celular, tope_credito, familiares } = body;

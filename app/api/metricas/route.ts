@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyToken } from '@/lib/auth';
+import { requireUser } from '@/lib/auth-guard';
 
 function getPeriodDates(tipo: string, desde?: string, hasta?: string) {
   const now = new Date();
@@ -50,26 +50,8 @@ function getPeriodDates(tipo: string, desde?: string, hasta?: string) {
 
 export async function GET(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      acc[name] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const token = cookies['session_token'];
-    if (!token) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const usuario = await verifyToken(token);
-    if (!usuario) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
-    }
-
-    if (usuario.rol !== 'dueño') {
-      return NextResponse.json({ error: 'Solo el dueño puede ver métricas' }, { status: 403 });
-    }
+    const auth = await requireUser(request, { rol: 'dueño' });
+    if ('error' in auth) return auth.error;
 
     const { searchParams } = new URL(request.url);
     const periodoTipo = searchParams.get('periodo') || 'mes_actual';
@@ -79,8 +61,9 @@ export async function GET(request: Request) {
     let periodoInfo;
     try {
       periodoInfo = getPeriodDates(periodoTipo, desdeParam || undefined, hastaParam || undefined);
-    } catch (err: any) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Periodo inválido';
+      return NextResponse.json({ error: message }, { status: 400 });
     }
 
     const supabase = supabaseAdmin;
