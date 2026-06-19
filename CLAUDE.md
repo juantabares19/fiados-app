@@ -51,6 +51,14 @@ Two views underpin most financial calculations:
 
 When modifying these views: `DROP VIEW IF EXISTS vista_estado_mora` first, then `DROP VIEW IF EXISTS saldos_clientes`, recreate both. `CREATE OR REPLACE VIEW` will error if column positions change.
 
+### Financial mutations go through atomic RPCs (critical)
+`POST /api/fiados` and `POST /api/abonos` do **not** insert directly. They call Postgres functions `crear_fiado` / `crear_abono` (`supabase.rpc(...)`), defined in `supabase/migrations/20260618120003_atomic_fiado_abono_rpcs.sql`. Each function does `SELECT ... FOR UPDATE` on the client row, recomputes the balance under that lock, re-validates server-side (credit cap for fiados, balance for abonos), inserts the row + detail + `auditoria` entry, and returns a JSON summary — all in one transaction. This closes a double-spend race that plain read-then-write inserts had.
+
+Validation lives in the DB, not the route. The functions `RAISE EXCEPTION` with pipe-delimited codes like `TOPE_EXCEDIDO|<saldo>|<tope>|<disponible>`; the API route matches on `error.message` (`msg.includes('TOPE_EXCEDIDO')`, regex-parses the args) and maps each code to a user-facing message + HTTP status. When adding a new validation, raise it in the SQL function **and** handle the code in the route. CHECK constraints on `fiados.total > 0`, `abonos.monto > 0`, etc. are the DB-level last line of defense. The functions are `GRANT EXECUTE`-d only to `service_role`.
+
+### Dates are computed in Colombia time (fixed UTC-5)
+`lib/fechas.ts` centralizes all date math at a fixed `-05:00` offset (no DST) — `fechaHoyColombia()`, `anioMesColombia()`, `inicioDia()/finDia()`. Reports and "today" ranges must use these helpers, never `new Date()` directly, or boundaries drift by 5 hours. Mora thresholds and other tunables live in `lib/constants.ts` (`DIAS_MORA_ALERTA`, `LOGIN_MAX_INTENTOS`, `LOGIN_LOCKOUT_MINUTOS`, `TOKEN_EXPIRY`, etc.); input bounds (`MONTO_MAX`, `CANTIDAD_MAX`) in `lib/validation.ts`. Login is rate-limited (`20260618120004_login_throttle.sql`).
+
 ### Supabase relation casting pattern
 Supabase's JS client infers joined relations as arrays, but they behave as single objects for FK relations. Always use `as unknown as Type | null` — not `as Type | null` directly — or TypeScript will fail the build:
 ```typescript
@@ -65,7 +73,7 @@ Pages are `'use client'` components. Owner-only pages wrap their content in `<So
 
 ### Shared state
 - `useUsuario()` — current user + role, loaded once via `/api/auth/me`
-- `useConfig()` — store config (e.g. `nombre_tienda`), loaded via `/api/configuracion`. Used to personalize WhatsApp messages.
+- `useConfig()` (`contexts/ConfigContext.tsx`) — store config (e.g. `nombre_tienda`), loaded via `/api/configuracion`. Used to personalize WhatsApp messages.
 
 ### WhatsApp integration
 `lib/whatsapp.ts` generates `wa.me` deep-link messages for debt reminders and transaction confirmations. Numbers must be Colombian format (`3XXXXXXXXX`); the formatter normalizes to `57XXXXXXXXX`. No external API — opens WhatsApp natively.

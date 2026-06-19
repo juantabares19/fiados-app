@@ -4,178 +4,141 @@ PWA para digitalizar el proceso de fiados (crédito informal) de una tienda de b
 
 ## Stack Tecnológico
 
-- **Frontend**: Next.js 14+ (App Router) como PWA
-- **Backend/API**: Supabase (PostgreSQL + Auth)
-- **Hosting**: Vercel (free tier)
-- **UI**: Tailwind CSS (mobile-first)
+- **Framework**: Next.js 16 (App Router, Turbopack) + React 19 como PWA
+- **Base de datos**: Supabase (PostgreSQL). Se usa **solo como base de datos**, no Supabase Auth.
+- **Auth**: JWT propio firmado con `jose` + PIN hasheado con `bcryptjs`, en cookie `HttpOnly`.
+- **Hosting**: Vercel
+- **UI**: Tailwind CSS (mobile-first), sin librerías de componentes externas
 - **Lenguaje**: TypeScript
+
+> Para el detalle de arquitectura (flujo de auth, vistas de saldos, RPCs atómicos, etc.) ver **`CLAUDE.md`** y **`AGENTS.md`**.
 
 ## Requisitos
 
-- Node.js 18+
+- Node.js 20+ (requerido por Next.js 16)
 - Cuenta de Supabase
-- npm o yarn
+- npm
 
 ## Instalación
 
 ```bash
-# Clonar o crear el proyecto
-npx create-next-app@latest fiados-app --typescript --tailwind --eslint --app --src-dir=false --import-alias="@/*" --use-npm --yes
-
+git clone <repo>
 cd fiados-app
-
-# Instalar dependencias
-npm install @supabase/supabase-js @supabase/ssr bcryptjs
-
-npm install --save-dev @types/bcryptjs
+npm install
 ```
 
-## Configuración de Supabase
+## Configuración
 
-### 1. Crear proyecto en Supabase
+### 1. Variables de entorno
 
-1. Ve a [supabase.com](https://supabase.com) y crea una cuenta
-2. Crea un nuevo proyecto
-3. Ve a **Settings > API** y copia:
-   - `Project URL`
-   - `anon public` key
-
-### 2. Ejecutar SQL en Supabase
-
-1. En el dashboard de Supabase, ve a **SQL Editor**
-2. Copia el contenido de `supabase/schema.sql`
-3. Pégalo y ejecuta el SQL
-
-El schema incluye:
-- 6 tablas: usuarios, clientes, fiados, fiado_detalle, abonos, auditoria
-- Índices para optimizar consultas
-- Vista `saldos_clientes` para calcular saldos
-- Funciones y triggers para auditoría automática
-- Políticas RLS básicas (permiten todo a usuarios autenticados)
-
-### 3. Configurar variables de entorno
-
-Copia el archivo de ejemplo:
+Copia el archivo de ejemplo y complétalo:
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Edita `.env.local` y agrega tus credenciales de Supabase:
-
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
+# Solo en el servidor — nunca exponer al cliente. Las API routes la usan para
+# saltarse RLS (los roles anon/authenticated tienen deny-all).
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
+# Secreto para firmar los JWT de sesión. Mínimo 32 caracteres.
+JWT_SECRET=tu-secreto-de-al-menos-32-caracteres
 ```
 
-### 4. Crear usuario demo
+`SUPABASE_SERVICE_ROLE_KEY` y `JWT_SECRET` se leen al inicializar el cliente server (`lib/supabase/server.ts`) y el guard de auth; la app falla al arrancar si faltan.
 
-En Supabase SQL Editor, ejecuta:
+### 2. Base de datos
+
+1. En el dashboard de Supabase, ve a **SQL Editor** y ejecuta `supabase/schema.sql` (tablas, índices, vistas, triggers de auditoría).
+2. Aplica las migraciones de `supabase/migrations/` con la CLI:
+
+   ```bash
+   supabase db query --linked --file supabase/migrations/<archivo>.sql
+   ```
+
+   Estas añaden, entre otras cosas: RLS deny-all para roles públicos, los RPCs atómicos `crear_fiado` / `crear_abono`, throttling de login y `vista_estado_mora`. Ver la sección *Migrations* de `CLAUDE.md`: los nombres freeform se omiten con `db push`, por eso se aplican con `db query`.
+
+Vistas clave:
+- **`saldos_clientes`** — saldo de cada cliente (`SUM(fiados) - SUM(abonos)`).
+- **`vista_estado_mora`** — clasifica clientes en `al_dia / moroso / critico`.
+
+### 3. Crear el primer usuario
+
+No hay registro público. Inserta un usuario directamente (PIN hasheado con bcrypt). El rol es `dueño` o `tendero`:
 
 ```sql
--- Insertar usuario demo (PIN: 1234)
--- El hash es bcrypt de "1234"
 INSERT INTO usuarios (nombre, celular, pin, rol) VALUES
-('Juan Pérez', '3001234567', '$2a$10$rOzJqQZQGKzQZQN7pBJYQOQY9P9QZQGKzQZQN7pBJYQOQY9P9QZ', 'dueño');
+('Juan Pérez', '3001234567', '<hash-bcrypt-del-pin>', 'dueño');
 ```
+
+Existe `scripts/crear-usuario.ts` como ayuda para generar el hash y crear usuarios de forma interactiva.
 
 ## Ejecutar en local
 
 ```bash
-npm run dev
+npm run dev     # localhost:3000 (Turbopack)
+npm run build   # build de producción — corre type-check primero
+npm run lint    # ESLint
 ```
 
-Abre [http://localhost:3000](http://localhost:3000)
+No hay tests automatizados; `npx tsc --noEmit` es el único chequeo estático adicional al lint.
 
 ## Estructura del Proyecto
 
 ```
 fiados-app/
-├── app/                          # App Router
-│   ├── layout.tsx                # Layout principal con meta tags PWA
-│   ├── page.tsx                  # Página de login
-│   ├── (auth)/                   # Grupo de rutas protegidas
-│   │   ├── layout.tsx            # Layout con navegación
-│   │   ├── inicio/page.tsx       # Pantalla de inicio
-│   │   ├── clientes/page.tsx     # Gestión de clientes
-│   │   ├── fiados/page.tsx       # Registro de fiados
-│   │   ├── abonos/page.tsx       # Registro de abonos
-│   │   ├── actividad/page.tsx    # Actividad diaria (solo dueño)
-│   │   ├── morosos/page.tsx      # Lista de morosos (solo dueño)
-│   │   ├── metricas/page.tsx      # Métricas (solo dueño)
-│   │   └── configuracion/page.tsx # Configuración (solo dueño)
-│   └── api/auth/                 # Rutas API de autenticación
-│       ├── login/route.ts
-│       └── logout/route.ts
-├── components/
-│   ├── ui/                       # Componentes reutilizables
-│   │   ├── Button.tsx
-│   │   ├── Input.tsx
-│   │   ├── Card.tsx
-│   │   ├── Badge.tsx
-│   │   ├── Modal.tsx
-│   │   ├── SearchInput.tsx
-│   │   └── EmptyState.tsx
-│   └── layout/
-│       ├── Header.tsx             # Header con botón hamburguesa
-│       └── MobileNav.tsx          # Menú lateral
+├── app/
+│   ├── layout.tsx                # Layout raíz + meta tags PWA
+│   ├── page.tsx                  # Login (celular + PIN)
+│   ├── (auth)/                   # Rutas protegidas (UsuarioProvider + ConfigProvider)
+│   │   ├── layout.tsx            # Header + MobileNav
+│   │   ├── inicio/               # Pantalla de inicio
+│   │   ├── clientes/             # CRUD de clientes, saldos, historial
+│   │   ├── fiados/               # Registro de fiados con productos
+│   │   ├── abonos/               # Registro de abonos
+│   │   ├── actividad/            # Actividad diaria
+│   │   ├── morosos/              # Lista de morosos (solo dueño)
+│   │   ├── metricas/             # Métricas (solo dueño)
+│   │   └── configuracion/        # Configuración (solo dueño)
+│   └── api/                      # API routes (auth via requireUser())
+│       ├── auth/ {login,logout,me}
+│       ├── clientes/  fiados/  abonos/  morosos/  metricas/
+│       ├── actividad/  configuracion/  resumen/
+├── components/ {ui, layout, auth, clientes, whatsapp}
+├── contexts/ConfigContext.tsx    # useConfig() — config de la tienda
+├── hooks/useUsuario.tsx          # useUsuario() — usuario + rol actual
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts             # Cliente para browser
-│   │   ├── server.ts             # Cliente para server components
-│   │   └── middleware.ts          # Lógica de auth para middleware
-│   ├── types.ts                  # Tipos TypeScript
-│   └── utils.ts                  # Helper functions
-├── public/
-│   ├── manifest.json             # Manifiesto PWA
-│   ├── sw.js                     # Service Worker
-│   └── icons/                    # Íconos PWA
-├── middleware.ts                  # Middleware Next.js
-└── supabase/
-    └── schema.sql                # Schema completo de base de datos
+│   ├── supabase/server.ts        # supabaseAdmin (service_role, sin RLS)
+│   ├── auth.ts  auth-guard.ts    # JWT + requireUser()
+│   ├── fechas.ts                 # fechas en hora de Colombia (UTC-5 fijo)
+│   ├── constants.ts validation.ts queries.ts whatsapp.ts
+│   └── database.types.ts types.ts utils.ts
+├── public/ {manifest.json, sw.js, icons/}
+├── middleware.ts                 # Gate de páginas (lee cookie session_token)
+└── supabase/ {schema.sql, migrations/}
 ```
+
+## Características
+
+- Login con celular y PIN (JWT propio, sesiones revocables vía `token_version`).
+- Dos roles: **dueño** (acceso total) y **tendero** (limitado).
+- CRUD de clientes con tope de crédito, saldos e historial.
+- Registro de fiados (con detalle de productos) y abonos mediante **RPCs atómicos** que bloquean la fila del cliente, evitando sobregiros por concurrencia.
+- Detección de morosos y estado de mora (`al_dia / moroso / critico`).
+- Métricas y reportes para el dueño, calculados en hora de Colombia.
+- Estados de cuenta y recordatorios por **WhatsApp** vía deep-links `wa.me` (sin API externa).
+- PWA instalable en Android.
 
 ## Deploy en Vercel
 
-### 1. Conectar repositorio
-
-1. Sube el código a GitHub
-2. Ve a [vercel.com](https://vercel.com)
-3. Importa el repositorio
-
-### 2. Configurar variables de entorno
-
-En Vercel, ve a **Settings > Environment Variables** y agrega:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### 3. Deploy
-
-Vercel detectará Next.js automáticamente y hará deploy.
-
-## Funcionalidades Implementadas
-
-- Login con celular y PIN
-- Navegación responsive con menú hamburguesa
-- Protección de rutas via middleware
-- PWA instalable en Android
-- Vista placeholder de inicio con 3 botones principales
-- Estructura de carpetas lista para implementar funcionalidades
-
-## Próximos Pasos
-
-1. Implementar autenticación completa con Supabase Auth
-2. Crear CRUD de clientes
-3. Crear registro de fiados con productos
-4. Crear registro de abonos
-5. Implementar envío de estados de cuenta por WhatsApp
-6. Agregar métricas y reportes para el dueño
+1. Sube el código a GitHub e importa el repo en [vercel.com](https://vercel.com).
+2. En **Settings > Environment Variables** agrega `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `JWT_SECRET`.
+3. Vercel detecta Next.js y hace deploy automáticamente.
 
 ## Notas de Diseño
 
-- **Mobile-first**: Todo el CSS prioriza pantallas de 5.5" a 6.5"
-- **Texto mínimo**: 16px (text-base)
-- **Botones mínimo**: 48px de altura (h-12)
-- **Formato moneda**: $18.500 (peso colombiano, punto como separador de miles)
-- **Sin librerías de componentes externas**: Solo Tailwind puro
+- **Mobile-first**: CSS pensado para pantallas de 5.5" a 6.5".
+- **Texto mínimo**: 16px (text-base). **Botones**: mínimo 48px de alto (h-12).
+- **Formato moneda**: $18.500 (peso colombiano, punto como separador de miles).
+- **Fechas**: siempre en hora de Colombia (UTC-5 fijo, sin horario de verano) vía `lib/fechas.ts`.
