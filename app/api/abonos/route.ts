@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { esNumeroPositivo } from '@/lib/validation';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
 
 const METODOS_PAGO = ['efectivo', 'nequi', 'daviplata', 'llaves', 'otro'];
@@ -116,8 +117,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cliente es requerido' }, { status: 400 });
     }
 
-    if (!monto || monto <= 0) {
-      return NextResponse.json({ error: 'El monto debe ser mayor a 0' }, { status: 400 });
+    if (!esNumeroPositivo(monto)) {
+      return NextResponse.json({ error: 'El monto debe ser un número válido mayor a 0' }, { status: 400 });
     }
 
     if (!metodo_pago || !METODOS_PAGO.includes(metodo_pago)) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { esNumeroPositivo, CANTIDAD_MAX } from '@/lib/validation';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
@@ -142,11 +143,11 @@ export async function POST(request: Request) {
       if (!p.producto || p.producto.trim() === '') {
         return NextResponse.json({ error: 'Todos los productos deben tener nombre' }, { status: 400 });
       }
-      if (!p.cantidad || p.cantidad <= 0) {
-        return NextResponse.json({ error: 'La cantidad debe ser mayor a 0' }, { status: 400 });
+      if (!esNumeroPositivo(p.cantidad, CANTIDAD_MAX)) {
+        return NextResponse.json({ error: 'La cantidad debe ser un número válido mayor a 0' }, { status: 400 });
       }
-      if (!p.valor_unitario || p.valor_unitario <= 0) {
-        return NextResponse.json({ error: 'El valor unitario debe ser mayor a 0' }, { status: 400 });
+      if (!esNumeroPositivo(p.valor_unitario)) {
+        return NextResponse.json({ error: 'El valor unitario debe ser un número válido mayor a 0' }, { status: 400 });
       }
     }
 

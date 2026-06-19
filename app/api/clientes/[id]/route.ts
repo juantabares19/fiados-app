@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { esNumeroPositivo } from '@/lib/validation';
 import { DIAS_MORA_ALERTA, DIAS_MORA_CRITICO } from '@/lib/constants';
 
 export async function GET(
@@ -155,7 +156,7 @@ export async function PUT(
       estado: estado || 'activo',
     };
 
-    if (tope_credito !== undefined && tope_credito > 0) {
+    if (esNumeroPositivo(tope_credito)) {
       updateData.tope_credito = tope_credito;
     }
 
