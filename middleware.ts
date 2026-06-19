@@ -1,17 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { verifyToken, encodeUserData } from '@/lib/auth';
+import { verifyToken } from '@/lib/auth';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const cookieHeader = request.headers.get('cookie') || '';
-
-  const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-    const [name, value] = cookie.trim().split('=');
-    acc[name] = value;
-    return acc;
-  }, {} as Record<string, string>);
-
-  const token = cookies['session_token'];
+  const token = request.cookies.get('session_token')?.value;
   const usuario = token ? await verifyToken(token) : null;
 
   const isAuthPage = pathname === '/';
@@ -33,18 +25,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/inicio', request.url));
   }
 
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  if (usuario) {
-    const userData = encodeUserData(usuario);
-    response.headers.set('x-user-data', userData);
-  }
-
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

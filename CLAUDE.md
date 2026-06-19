@@ -25,25 +25,24 @@ There are no automated tests. TypeScript (`npx tsc --noEmit`) is the only static
 ## Architecture
 
 ### Auth flow
-Custom JWT auth — no Supabase Auth. On login, the server creates a signed JWT (via `jose`) and sets it as an `HttpOnly; SameSite=Strict` cookie named `session_token`. The `middleware.ts` (currently warns as deprecated — should migrate to `proxy`) reads this cookie on every request, verifies it, and attaches encoded user data to a `x-user-data` response header.
+Custom JWT auth — no Supabase Auth. On login, the server creates a signed JWT (via `jose`) and sets it as an `HttpOnly; SameSite=Strict` cookie named `session_token`. The `middleware.ts` (currently warns as deprecated — should migrate to `proxy`) reads this cookie on every request and verifies it to gate page access (redirecting unauthenticated requests). API routes independently enforce auth via `requireUser()` (`lib/auth-guard.ts`), which re-verifies the JWT and checks `activo` + `token_version` against the DB on every call so logout/deactivation revoke sessions immediately.
 
 Client-side auth state lives in `UsuarioProvider` (`hooks/useUsuario.tsx`), which hydrates by calling `GET /api/auth/me`. The `SoloDueño` component (`components/auth/SoloDueño.tsx`) gates any owner-only UI.
 
 Two roles exist: `dueño` (full access) and `tendero` (limited). Most `/api/metricas`, `/api/morosos`, and `/api/configuracion` routes are `dueño`-only.
 
-### Cookie parsing pattern
-All API routes parse cookies manually (no Next.js `cookies()` helper):
+### Auth in API routes
+API routes do not parse cookies manually. They call `requireUser()` from `lib/auth-guard.ts`, which reads the cookie via Next's `cookies()` helper, verifies the JWT, and checks `activo` + `token_version` against the DB:
 ```typescript
-const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-  const [name, value] = cookie.trim().split('=');
-  acc[name] = value;
-  return acc;
-}, {} as Record<string, string>);
+const auth = await requireUser();              // any role
+const auth = await requireUser({ rol: 'dueño' }); // owner-only
+if ('error' in auth) return auth.error;
+const { usuario } = auth;
 ```
+`middleware.ts` reads the cookie with `request.cookies.get('session_token')`.
 
-### Supabase clients
-- **Server** (`lib/supabase/server.ts`): `supabaseAdmin` — uses `SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS, used in all API routes. Initialized at module level; throws on missing env vars.
-- **Client** (`lib/supabase/client.ts`): browser client using `@supabase/ssr` + anon key; used sparingly in client components.
+### Supabase client
+- **Server** (`lib/supabase/server.ts`): `supabaseAdmin` — uses `SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS, used in all API routes. Initialized at module level; throws on missing env vars. There is no browser Supabase client: the app never talks to Supabase from the client, and `anon`/`authenticated` roles have no DB grants (see RLS deny-all).
 
 ### Database views (critical)
 Two views underpin most financial calculations:

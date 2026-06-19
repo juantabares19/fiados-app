@@ -59,15 +59,3 @@ export function createSessionCookie(token: string): string {
 export function deleteSessionCookie(): string {
   return 'session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0';
 }
-
-export function encodeUserData(payload: UsuarioPayload): string {
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
-}
-
-export function decodeUserData(data: string): UsuarioPayload | null {
-  try {
-    return JSON.parse(Buffer.from(data, 'base64').toString('utf-8'));
-  } catch {
-    return null;
-  }
-}
