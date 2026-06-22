@@ -141,7 +141,8 @@ export default function InicioPage() {
               >
                 <div className="text-center">
                   <p className="text-3xl font-bold text-orange-600">{resumen?.clientes_con_deuda || '...'}</p>
-                  <p className="text-sm text-gray-500 mt-1">Morosos</p>
+                  <p className="text-sm text-gray-500 mt-1">Con deuda</p>
+                  <p className="text-xs text-gray-400 mt-0.5">tienen saldo pendiente</p>
                 </div>
               </Card>
               <Card
@@ -152,7 +153,8 @@ export default function InicioPage() {
                   <p className="text-3xl font-bold text-red-600">
                     {resumen?.total_morosos || 0}
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">En mora</p>
+                  <p className="text-sm text-gray-500 mt-1">Morosos</p>
+                  <p className="text-xs text-gray-400 mt-0.5">+15 días sin abonar</p>
                 </div>
               </Card>
               <Card

@@ -106,7 +106,10 @@ function MorososContent() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold text-gray-900">Morosos</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Morosos</h1>
+          <p className="text-xs text-gray-400">clientes con más de 15 días sin abonar</p>
+        </div>
       </div>
 
       {cargando && (
@@ -131,6 +134,7 @@ function MorososContent() {
           <Card className="p-4 bg-red-50 border border-red-200">
             <div className="text-center">
               <p className="text-sm font-medium text-red-600 mb-1">CARTERA EN RIESGO</p>
+              <p className="text-xs text-red-400 mb-2">deuda acumulada de clientes con mora activa</p>
               <p className="text-3xl font-bold text-red-700">
                 {formatearMoneda(resumen.deuda_morosos + resumen.deuda_criticos)}
                 <span className="text-lg ml-1">({resumen.porcentaje_en_riesgo}%)</span>
@@ -140,6 +144,14 @@ function MorososContent() {
                 <span className="text-orange-600">🟠 {resumen.total_morosos - resumen.total_criticos} morosos</span>
               </div>
             </div>
+          </Card>
+
+          <Card className="p-3 bg-gray-50 border border-gray-200">
+            <p className="text-xs text-gray-500 text-center leading-relaxed">
+              🟠 <span className="font-medium">Moroso:</span> entre 15 y 30 días sin abonar
+              {'  ·  '}
+              🔴 <span className="font-medium">Crítico:</span> más de 30 días sin abonar
+            </p>
           </Card>
 
           <div className="flex gap-2">
