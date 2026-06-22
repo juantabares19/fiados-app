@@ -27,6 +27,7 @@ function NuevoFiadoContent() {
   const [clientePreseleccionadoId, setClientePreseleccionadoId] = useState<string | null>(null);
   const [clientePreseleccionadoCargado, setClientePreseleccionadoCargado] = useState(false);
   const [cargandoPreseleccionado, setCargandoPreseleccionado] = useState(false);
+  const [clienteBloqueadoError, setClienteBloqueadoError] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteConSaldo | null>(null);
   const [quienPidio, setQuienPidio] = useState<'cliente' | 'familiar'>('cliente');
   const [familiar, setFamiliar] = useState('');
@@ -51,6 +52,10 @@ function NuevoFiadoContent() {
       const response = await fetch(`/api/clientes/${id}`);
       if (response.ok) {
         const data = await response.json();
+        if (data.estado === 'bloqueado') {
+          setClienteBloqueadoError(true);
+          return;
+        }
         setClienteSeleccionado(data);
         setPaso(2);
       }
@@ -157,6 +162,36 @@ function NuevoFiadoContent() {
     setClientePreseleccionadoId(null);
     setClientePreseleccionadoCargado(false);
   };
+
+  if (clienteBloqueadoError) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Nuevo Fiado</h1>
+        </div>
+        <Card className="p-6 text-center space-y-3 bg-red-50 border border-red-200">
+          <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+          <p className="font-semibold text-lg text-red-800">Cliente bloqueado</p>
+          <p className="text-red-600 text-sm">No se pueden registrar fiados a este cliente. Si tiene deuda pendiente, puede registrar un abono.</p>
+          <Button variant="outline" className="w-full h-12" onClick={() => router.back()}>
+            Volver
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (cargandoPreseleccionado) {
     return (

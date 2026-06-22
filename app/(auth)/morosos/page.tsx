@@ -163,7 +163,7 @@ function MorososContent() {
             </button>
           </div>
 
-          {clientesFiltrados.length === 0 && (
+          {clientesCriticos.length === 0 && clientesMorosos.length === 0 && (
             <EmptyState
               title="🎉 ¡Todos al día!"
               description="No hay clientes morosos en este momento."
@@ -175,7 +175,7 @@ function MorososContent() {
             />
           )}
 
-          {clientesFiltrados.length > 0 && (
+          {(clientesCriticos.length > 0 || clientesMorosos.length > 0) && (
             <div className="space-y-4">
               {clientesCriticos.length > 0 && (
                 <div>

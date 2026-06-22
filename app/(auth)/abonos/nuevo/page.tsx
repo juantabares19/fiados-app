@@ -207,6 +207,14 @@ function NuevoAbonoContent() {
           <h1 className="text-2xl font-bold text-gray-900">Registrar Abono</h1>
         </div>
 
+        {clienteSeleccionado.estado === 'bloqueado' && (
+          <Card className="p-3 bg-orange-50 border border-orange-200">
+            <p className="text-orange-800 text-sm text-center">
+              ⚠️ Cliente bloqueado — solo se puede registrar el abono de deuda pendiente.
+            </p>
+          </Card>
+        )}
+
         <Card className="p-4 text-center">
           <p className="text-sm text-gray-500 mb-1">{clienteSeleccionado.nombre}</p>
           <p className="text-sm text-gray-500">SALDO PENDIENTE</p>
