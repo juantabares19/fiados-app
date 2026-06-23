@@ -340,20 +340,6 @@ export default function ClientePerfilPage() {
         Enviar por WhatsApp
       </Button>
 
-      <Button
-        variant="outline"
-        className="w-full h-12"
-        onClick={handleGenerarPDF}
-        disabled={generandoPdf}
-      >
-        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-        {generandoPdf ? 'Generando PDF...' : 'Estado de cuenta (PDF)'}
-      </Button>
-      {pdfError && (
-        <p className="text-red-600 text-sm text-center">{pdfError}</p>
-      )}
       {tieneSaldo && (
         <>
           <Button
@@ -371,6 +357,21 @@ export default function ClientePerfilPage() {
             <p className="text-red-600 text-sm text-center">{pdfDeudaError}</p>
           )}
         </>
+      )}
+
+      <Button
+        variant="outline"
+        className="w-full h-12"
+        onClick={handleGenerarPDF}
+        disabled={generandoPdf}
+      >
+        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        {generandoPdf ? 'Generando PDF...' : 'Historial total de cartera (PDF)'}
+      </Button>
+      {pdfError && (
+        <p className="text-red-600 text-sm text-center">{pdfError}</p>
       )}
 
       {esDueño && !estaBloqueado && (
