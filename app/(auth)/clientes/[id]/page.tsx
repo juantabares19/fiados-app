@@ -191,10 +191,28 @@ export default function ClientePerfilPage() {
         pagina++;
       }
       const soloFiados = todos.filter(m => m.tipo === 'fiado');
+
+      // LIFO: fiados más recientes primero, acumular hasta cubrir el saldo activo.
+      const fiadosOrdenados = [...soloFiados].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      const fiadosActivos: typeof fiadosOrdenados = [];
+      let acumulado = 0;
+      for (const f of fiadosOrdenados) {
+        if (acumulado >= resumen.saldo) break;
+        fiadosActivos.push(f);
+        acumulado += f.total ?? 0;
+      }
+      const resumenActivo: ResumenPDF = {
+        total_fiado: acumulado,
+        total_abonado: Math.max(0, acumulado - resumen.saldo),
+        saldo: resumen.saldo,
+      };
+
       const { blob, filename } = generarDeudaActivaPDF({
         cliente: { nombre: cliente.nombre, celular: cliente.celular },
-        movimientos: soloFiados,
-        resumen,
+        movimientos: fiadosActivos,
+        resumen: resumenActivo,
         nombreTienda,
       });
       await compartirODescargarPDF(blob, filename);

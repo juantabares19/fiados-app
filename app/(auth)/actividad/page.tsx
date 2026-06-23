@@ -57,8 +57,11 @@ function getNombreDia(date: Date): string {
   return dias[date.getDay()];
 }
 
-function formatDateISO(date: Date): string {
-  return date.toISOString().split('T')[0];
+function formatDateLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function parseFecha(fechaStr: string): Date {
@@ -78,8 +81,8 @@ function ActividadContent() {
   const [filtroTipo, setFiltroTipo] = useState<FilterTipo>('todos');
   const [filtroTendero, setFiltroTendero] = useState<string>('todos');
 
-  const fechaStr = formatDateISO(fechaActual);
-  const esHoy = formatDateISO(new Date()) === fechaStr;
+  const fechaStr = formatDateLocal(fechaActual);
+  const esHoy = formatDateLocal(new Date()) === fechaStr;
   const nombreDia = getNombreDia(fechaActual);
   const fechaFormateada = fechaActual.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -103,6 +106,16 @@ function ActividadContent() {
   useEffect(() => {
     cargarActividad(fechaStr);
   }, [fechaStr, cargarActividad]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && esHoy) {
+        cargarActividad(fechaStr);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [esHoy, fechaStr, cargarActividad]);
 
   const diaAnterior = () => {
     const nueva = new Date(fechaActual);
