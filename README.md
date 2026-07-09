@@ -77,12 +77,16 @@ Existe `scripts/crear-usuario.ts` como ayuda para generar el hash y crear usuari
 ## Ejecutar en local
 
 ```bash
-npm run dev     # localhost:3000 (Turbopack)
-npm run build   # build de producción — corre type-check primero
-npm run lint    # ESLint
+npm run dev          # localhost:3000 (Turbopack)
+npm run build        # build de producción — corre type-check primero
+npm run lint         # ESLint
+npm test             # Vitest — unit/componentes (__tests__/)
+npm run test:watch   # Vitest en modo watch
+npm run test:coverage
+npm run test:e2e     # Playwright (e2e/) — requiere la app corriendo/build
 ```
 
-No hay tests automatizados; `npx tsc --noEmit` es el único chequeo estático adicional al lint.
+`npx tsc --noEmit` es el único chequeo estático adicional al lint.
 
 ## Estructura del Proyecto
 
@@ -112,10 +116,14 @@ fiados-app/
 │   ├── supabase/server.ts        # supabaseAdmin (service_role, sin RLS)
 │   ├── auth.ts  auth-guard.ts    # JWT + requireUser()
 │   ├── fechas.ts                 # fechas en hora de Colombia (UTC-5 fijo)
+│   ├── fiados.ts                 # lógica de negocio de fiados (cancelación, cálculo de productos/total/tope), compartida entre API routes y componentes
 │   ├── constants.ts validation.ts queries.ts whatsapp.ts
 │   └── database.types.ts types.ts utils.ts
+├── __tests__/ {lib/, components/} # Vitest — unit/componentes
+├── e2e/                           # Playwright — smoke + login
 ├── public/ {manifest.json, sw.js, icons/}
 ├── middleware.ts                 # Gate de páginas (lee cookie session_token)
+├── vitest.config.ts  vitest.setup.ts  playwright.config.ts
 └── supabase/ {schema.sql, migrations/}
 ```
 
