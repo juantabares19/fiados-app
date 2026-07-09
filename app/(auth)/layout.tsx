@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useUsuario } from '@/hooks/useUsuario';
+import { useUsuario } from '@/state/useUsuario';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { UsuarioProvider } from '@/hooks/useUsuario';
-import { ConfigProvider } from '@/contexts/ConfigContext';
+import { UsuarioProvider } from '@/state/useUsuario';
+import { ConfigProvider } from '@/state/ConfigContext';
 
 function AuthLayoutInner({ children }: { children: React.ReactNode }) {
   const [isNavOpen, setIsNavOpen] = useState(false);

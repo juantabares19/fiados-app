@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ClienteConSaldo } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { useUsuario } from '@/hooks/useUsuario';
+import { useUsuario } from '@/state/useUsuario';
 import { formatearMoneda } from '@/lib/utils';
 
 export default function EditarClientePage() {

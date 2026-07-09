@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { SelectorCliente } from '@/components/clientes/SelectorCliente';
 import { formatearMoneda } from '@/lib/utils';
 import { generarMensajeConfirmacionAbono, abrirWhatsApp } from '@/lib/whatsapp';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig } from '@/state/ConfigContext';
 
 interface AbonoCreado {
   id: string;

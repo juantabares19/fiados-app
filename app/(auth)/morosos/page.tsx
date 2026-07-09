@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatearMoneda, formatearFechaCorta, calcularEstadoMora } from '@/lib/utils';
 import { generarMensajeRecordatorio, BotonWhatsApp } from '@/lib/whatsapp';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig } from '@/state/ConfigContext';
 
 interface ClienteMora {
   id: string;

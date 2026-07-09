@@ -1,6 +1,6 @@
 'use client';
 
-import { useUsuario } from '@/hooks/useUsuario';
+import { useUsuario } from '@/state/useUsuario';
 import { Card } from '@/components/ui/Card';
 
 export function SoloDueño({ children }: { children: React.ReactNode }) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SoloDueño } from '@/components/auth/SoloDueño';
-import { useUsuario } from '@/hooks/useUsuario';
+import { useUsuario } from '@/state/useUsuario';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';

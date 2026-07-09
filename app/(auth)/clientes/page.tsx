@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { getClientes } from '@/lib/queries';
-import { ClientesList } from './ClientesList';
+import { ClientesList } from '@/components/clientes/ClientesList';
 import { Card } from '@/components/ui/Card';
 
 // Datos financieros: nunca servir saldos cacheados (cambian con cada fiado/abono).

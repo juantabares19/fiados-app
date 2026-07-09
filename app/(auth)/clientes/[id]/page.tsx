@@ -7,11 +7,11 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { useUsuario } from '@/hooks/useUsuario';
+import { useUsuario } from '@/state/useUsuario';
 import { formatearMoneda, formatearFechaCorta, formatearHora, calcularEstadoMora } from '@/lib/utils';
 import { generarMensajeEstadoCuenta, generarMensajeRecordatorio, abrirWhatsApp } from '@/lib/whatsapp';
 import { generarEstadoCuentaPDF, generarDeudaActivaPDF, compartirODescargarPDF, type MovimientoPDF, type ResumenPDF } from '@/lib/pdf';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig } from '@/state/ConfigContext';
 import Link from 'next/link';
 
 interface DetalleProducto {

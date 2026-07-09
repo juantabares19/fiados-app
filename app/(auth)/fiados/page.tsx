@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { getFiados } from '@/lib/queries';
-import { FiadosList } from './FiadosList';
+import { FiadosList } from '@/components/fiados/FiadosList';
 import { Card } from '@/components/ui/Card';
 
 // Datos financieros: nunca servir una lista cacheada (cambia con cada fiado nuevo).
