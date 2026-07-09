@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useUsuario } from '@/hooks/useUsuario';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { UsuarioProvider } from '@/hooks/useUsuario';
 import { ConfigProvider } from '@/contexts/ConfigContext';
 
@@ -18,17 +19,26 @@ function AuthLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header userName={usuario?.nombre || 'Usuario'} onMenuClick={() => setIsNavOpen(true)} />
-      <MobileNav
-        isOpen={isNavOpen}
-        onClose={() => setIsNavOpen(false)}
+      <Sidebar
         userRole={usuario?.rol || 'tendero'}
         userName={usuario?.nombre || 'Usuario'}
         onLogout={handleLogout}
       />
-      <main className="p-4 pb-24">
-        {children}
-      </main>
+      <div className="lg:ml-64">
+        <Header userName={usuario?.nombre || 'Usuario'} onMenuClick={() => setIsNavOpen(true)} />
+        <MobileNav
+          isOpen={isNavOpen}
+          onClose={() => setIsNavOpen(false)}
+          userRole={usuario?.rol || 'tendero'}
+          userName={usuario?.nombre || 'Usuario'}
+          onLogout={handleLogout}
+        />
+        <main className="p-4 pb-24 lg:p-8 lg:pb-8">
+          <div className="mx-auto max-w-6xl">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
