@@ -23,3 +23,68 @@ export function puedeCancelarFiado(
 
   return creado > hace5Min && fiado.usuario_id === usuarioId;
 }
+
+// ============================================================
+// Lógica del formulario de "Nuevo Fiado" (extraída del componente para testearla).
+// ============================================================
+
+/**
+ * Item de producto del formulario. Cantidad y valor_unitario se guardan como
+ * texto (input libre, el usuario puede borrar el campo mientras escribe) y se
+ * convierten a número al validar/calcular.
+ */
+export interface ProductoFiado {
+  producto: string;
+  cantidad: string;
+  valor_unitario: string;
+}
+
+/**
+ * ¿El renglón califica como producto válido para enviar al servidor?
+ * Mismo criterio que usa la API: nombre no vacío, cantidad > 0, valor > 0.
+ */
+export function esProductoValido(p: ProductoFiado): boolean {
+  return p.producto.trim() !== '' && Number(p.cantidad) > 0 && Number(p.valor_unitario) > 0;
+}
+
+/** Renglones que se van a enviar al servidor. */
+export function filtrarProductosValidos(productos: ProductoFiado[]): ProductoFiado[] {
+  return productos.filter(esProductoValido);
+}
+
+/**
+ * Renglones con algo escrito (nombre o valor) que NO califican como válidos.
+ * Importante para no descartarlos en silencio: si se ignoraran, el total
+ * mostrado no coincidiría con lo guardado. El formulario los bloquea antes
+ * de confirmar.
+ */
+export function filtrarProductosIncompletos(productos: ProductoFiado[]): ProductoFiado[] {
+  const validos = filtrarProductosValidos(productos);
+  return productos.filter(
+    p => !validos.includes(p) && (p.producto.trim() !== '' || p.valor_unitario.trim() !== '')
+  );
+}
+
+/** Suma de subtotales de los productos válidos. */
+export function calcularTotalFiado(productos: ProductoFiado[]): number {
+  return filtrarProductosValidos(productos).reduce(
+    (sum, p) => sum + Number(p.cantidad) * Number(p.valor_unitario),
+    0
+  );
+}
+
+/** Crédito disponible = tope − saldo actual. Puede ser 0 o negativo. */
+export function calcularDisponible(saldo: number, tope: number): number {
+  return tope - saldo;
+}
+
+/** Nuevo saldo si se confirma el fiado = saldo actual + total. */
+export function calcularNuevoSaldo(saldo: number, total: number): number {
+  return saldo + total;
+}
+
+/** ¿El fiado supera el tope de crédito? */
+export function superaTopeCredito(nuevoSaldo: number, tope: number): boolean {
+  return nuevoSaldo > tope;
+}
+

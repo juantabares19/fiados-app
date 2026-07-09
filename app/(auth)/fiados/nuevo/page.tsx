@@ -9,6 +9,14 @@ import { Modal } from '@/components/ui/Modal';
 import { useUsuario } from '@/hooks/useUsuario';
 import { SelectorCliente } from '@/components/clientes/SelectorCliente';
 import { formatearMoneda } from '@/lib/utils';
+import {
+  filtrarProductosValidos,
+  filtrarProductosIncompletos,
+  calcularTotalFiado,
+  calcularDisponible,
+  calcularNuevoSaldo,
+  superaTopeCredito,
+} from '@/lib/fiados';
 
 interface ProductoForm {
   producto: string;
@@ -94,17 +102,13 @@ function NuevoFiadoContent() {
     setProductos(nuevos);
   };
 
-  // Productos que realmente se van a enviar (mismo criterio que usa el servidor).
-  const productosValidos = productos.filter(p => p.producto.trim() !== '' && Number(p.cantidad) > 0 && Number(p.valor_unitario) > 0);
-  // Renglones con algo escrito (nombre o valor) que no califican como válidos —
-  // si se ignoraran en silencio, el total mostrado no coincidiría con lo guardado.
-  const productosIncompletos = productos.filter(
-    p => !productosValidos.includes(p) && (p.producto.trim() !== '' || p.valor_unitario.trim() !== '')
-  );
-  const total = productosValidos.reduce((sum, p) => sum + (Number(p.cantidad) * Number(p.valor_unitario)), 0);
-  const nuevoSaldo = clienteSeleccionado ? clienteSeleccionado.saldo + total : 0;
-  const disponible = clienteSeleccionado ? clienteSeleccionado.tope_credito - clienteSeleccionado.saldo : 0;
-  const superaTope = nuevoSaldo > (clienteSeleccionado?.tope_credito || 0);
+  // Cálculos de negocio delegados a lib/fiados.ts (testeables unitariamente).
+  const productosValidos = filtrarProductosValidos(productos);
+  const productosIncompletos = filtrarProductosIncompletos(productos);
+  const total = calcularTotalFiado(productos);
+  const nuevoSaldo = clienteSeleccionado ? calcularNuevoSaldo(clienteSeleccionado.saldo, total) : 0;
+  const disponible = clienteSeleccionado ? calcularDisponible(clienteSeleccionado.saldo, clienteSeleccionado.tope_credito) : 0;
+  const superaTope = superaTopeCredito(nuevoSaldo, clienteSeleccionado?.tope_credito || 0);
 
   const handleConfirmar = async () => {
     setError('');
