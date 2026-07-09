@@ -5,12 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { useUsuario } from '@/hooks/useUsuario';
 import { formatearMoneda } from '@/lib/utils';
 
 export default function NuevoClientePage() {
   const router = useRouter();
-  const { esDueño } = useUsuario();
   const [nombre, setNombre] = useState('');
   const [apodo, setApodo] = useState('');
   const [celular, setCelular] = useState('');
@@ -43,7 +41,7 @@ export default function NuevoClientePage() {
           nombre: nombre.trim(),
           apodo: apodo.trim() || null,
           celular: celularLimpio,
-          tope_credito: esDueño ? parseFloat(topeCredito) : 50000,
+          tope_credito: parseFloat(topeCredito),
           familiares: familiares.trim() || null,
         }),
       });
@@ -133,30 +131,28 @@ export default function NuevoClientePage() {
             />
           </div>
 
-          {esDueño && (
-            <div>
-              <label htmlFor="tope" className="block text-base font-medium text-gray-700 mb-2">
-                Tope de crédito
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                <input
-                  id="tope"
-                  type="tel"
-                  inputMode="numeric"
-                  placeholder="50000"
-                  value={topeCredito}
-                  onChange={(e) => setTopeCredito(e.target.value.replace(/\D/g, ''))}
-                  onBlur={handleTopeBlur}
-                  className="w-full h-12 pl-8 pr-4 text-lg rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-colors"
-                  disabled={guardando}
-                />
-              </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Límite máximo que puede deber ({formatearMoneda(50000)} por defecto)
-              </p>
+          <div>
+            <label htmlFor="tope" className="block text-base font-medium text-gray-700 mb-2">
+              Tope de crédito
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <input
+                id="tope"
+                type="tel"
+                inputMode="numeric"
+                placeholder="50000"
+                value={topeCredito}
+                onChange={(e) => setTopeCredito(e.target.value.replace(/\D/g, ''))}
+                onBlur={handleTopeBlur}
+                className="w-full h-12 pl-8 pr-4 text-lg rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-colors"
+                disabled={guardando}
+              />
             </div>
-          )}
+            <p className="text-sm text-gray-500 mt-1">
+              Límite máximo que puede deber ({formatearMoneda(50000)} por defecto)
+            </p>
+          </div>
 
           <div>
             <label htmlFor="familiares" className="block text-base font-medium text-gray-700 mb-2">

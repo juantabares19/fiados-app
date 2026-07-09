@@ -110,6 +110,19 @@ export async function DELETE(
 
     const clienteId = fiado.cliente_id;
 
+    // fiado_detalle.fiado_id -> fiados.id no tiene ON DELETE CASCADE en la BD real
+    // (a pesar de lo documentado en schema.sql), así que hay que borrar el detalle
+    // primero o el DELETE de fiados falla por violación de FK.
+    const { error: detalleError } = await supabase
+      .from('fiado_detalle')
+      .delete()
+      .eq('fiado_id', id);
+
+    if (detalleError) {
+      console.error('Error deleting fiado_detalle:', detalleError);
+      return NextResponse.json({ error: 'Error al cancelar fiado' }, { status: 500 });
+    }
+
     const { error: deleteError } = await supabase
       .from('fiados')
       .delete()

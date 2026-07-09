@@ -94,7 +94,14 @@ function NuevoFiadoContent() {
     setProductos(nuevos);
   };
 
-  const total = productos.reduce((sum, p) => sum + ((Number(p.cantidad) || 0) * (Number(p.valor_unitario) || 0)), 0);
+  // Productos que realmente se van a enviar (mismo criterio que usa el servidor).
+  const productosValidos = productos.filter(p => p.producto.trim() !== '' && Number(p.cantidad) > 0 && Number(p.valor_unitario) > 0);
+  // Renglones con algo escrito (nombre o valor) que no califican como válidos —
+  // si se ignoraran en silencio, el total mostrado no coincidiría con lo guardado.
+  const productosIncompletos = productos.filter(
+    p => !productosValidos.includes(p) && (p.producto.trim() !== '' || p.valor_unitario.trim() !== '')
+  );
+  const total = productosValidos.reduce((sum, p) => sum + (Number(p.cantidad) * Number(p.valor_unitario)), 0);
   const nuevoSaldo = clienteSeleccionado ? clienteSeleccionado.saldo + total : 0;
   const disponible = clienteSeleccionado ? clienteSeleccionado.tope_credito - clienteSeleccionado.saldo : 0;
   const superaTope = nuevoSaldo > (clienteSeleccionado?.tope_credito || 0);
@@ -102,9 +109,13 @@ function NuevoFiadoContent() {
   const handleConfirmar = async () => {
     setError('');
 
-    const productosValidos = productos.filter(p => p.producto.trim() !== '' && Number(p.cantidad) > 0 && Number(p.valor_unitario) > 0);
     if (productosValidos.length === 0) {
       setError('Agrega al menos un producto');
+      return;
+    }
+
+    if (productosIncompletos.length > 0) {
+      setError('Hay productos incompletos (les falta nombre o valor). Complétalos o bórralos antes de continuar.');
       return;
     }
 
@@ -401,7 +412,7 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
 
         <Button
           className="w-full h-14 text-lg"
-          disabled={guardando || superaTope || total === 0}
+          disabled={guardando || superaTope || total === 0 || productosIncompletos.length > 0}
           onClick={() => setMostrarModalConfirmar(true)}
         >
           {guardando ? 'Registrando...' : 'CONFIRMAR FIADO'}
@@ -635,7 +646,7 @@ if (clientePreseleccionadoCargado && clienteSeleccionado) {
 
         <Button
           className="w-full h-14 text-lg"
-          disabled={guardando || superaTope || total === 0}
+          disabled={guardando || superaTope || total === 0 || productosIncompletos.length > 0}
           onClick={() => setMostrarModalConfirmar(true)}
         >
           {guardando ? 'Registrando...' : 'CONFIRMAR FIADO'}

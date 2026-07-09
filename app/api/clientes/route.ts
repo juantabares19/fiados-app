@@ -112,9 +112,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const topeFinal = usuario.rol === 'dueño' && esNumeroPositivo(tope_credito)
-      ? tope_credito
-      : CREDITO_DEFAULT;
+    const topeFinal = esNumeroPositivo(tope_credito) ? tope_credito : CREDITO_DEFAULT;
 
     const { data: cliente, error } = await supabase
       .from('clientes')
