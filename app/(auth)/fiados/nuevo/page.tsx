@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ClienteConSaldo } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
-import { useUsuario } from '@/hooks/useUsuario';
 import { SelectorCliente } from '@/components/clientes/SelectorCliente';
 import { formatearMoneda } from '@/lib/utils';
 import {
@@ -29,12 +28,14 @@ interface ProductoForm {
 function NuevoFiadoContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { usuario } = useUsuario();
 
   const [paso, setPaso] = useState(1);
-  const [clientePreseleccionadoId, setClientePreseleccionadoId] = useState<string | null>(null);
-  const [clientePreseleccionadoCargado, setClientePreseleccionadoCargado] = useState(false);
-  const [cargandoPreseleccionado, setCargandoPreseleccionado] = useState(false);
+  const [clientePreseleccionadoCargado] = useState(
+    () => !!searchParams.get('cliente')
+  );
+  const [cargandoPreseleccionado, setCargandoPreseleccionado] = useState(
+    () => !!searchParams.get('cliente')
+  );
   const [clienteBloqueadoError, setClienteBloqueadoError] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteConSaldo | null>(null);
   const [quienPidio, setQuienPidio] = useState<'cliente' | 'familiar'>('cliente');
@@ -47,32 +48,30 @@ function NuevoFiadoContent() {
 
   useEffect(() => {
     const clienteId = searchParams.get('cliente');
-    if (clienteId) {
-      setClientePreseleccionadoId(clienteId);
-      cargarCliente(clienteId);
-      setClientePreseleccionadoCargado(true);
-    }
-  }, [searchParams]);
-
-  const cargarCliente = async (id: string) => {
-    setCargandoPreseleccionado(true);
-    try {
-      const response = await fetch(`/api/clientes/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.estado === 'bloqueado') {
-          setClienteBloqueadoError(true);
-          return;
+    if (!clienteId) return;
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch(`/api/clientes/${clienteId}`);
+        if (!active) return;
+        if (response.ok) {
+          const data = await response.json();
+          if (!active) return;
+          if (data.estado === 'bloqueado') {
+            setClienteBloqueadoError(true);
+            return;
+          }
+          setClienteSeleccionado(data);
+          setPaso(2);
         }
-        setClienteSeleccionado(data);
-        setPaso(2);
+      } catch (err) {
+        console.error('Error al cargar cliente:', err);
+      } finally {
+        if (active) setCargandoPreseleccionado(false);
       }
-    } catch (err) {
-      console.error('Error al cargar cliente:', err);
-    } finally {
-      setCargandoPreseleccionado(false);
-    }
-  };
+    })();
+    return () => { active = false; };
+  }, [searchParams]);
 
   const seleccionarCliente = (cliente: ClienteConSaldo) => {
     if (cliente.estado === 'bloqueado') {
@@ -164,18 +163,6 @@ function NuevoFiadoContent() {
     } finally {
       setGuardando(false);
     }
-  };
-
-  const reiniciar = () => {
-    setPaso(1);
-    setClienteSeleccionado(null);
-    setQuienPidio('cliente');
-    setFamiliar('');
-    setProductos([{ producto: '', cantidad: '1', valor_unitario: '' }]);
-    setNota('');
-    setError('');
-    setClientePreseleccionadoId(null);
-    setClientePreseleccionadoCargado(false);
   };
 
   if (clienteBloqueadoError) {

@@ -28,7 +28,7 @@ export function SelectorCliente({ onSeleccionar, clientePreseleccionadoId }: Sel
       if (!response.ok) throw new Error('Error al buscar clientes');
       const data = await response.json();
       setClientes(data);
-    } catch (err) {
+    } catch {
       setError('No se pudieron cargar los clientes');
       setClientes([]);
     } finally {
@@ -69,7 +69,7 @@ export function SelectorCliente({ onSeleccionar, clientePreseleccionadoId }: Sel
 
       {!cargando && clientesFiltrados.length === 0 && buscar && (
         <Card className="p-6 text-center">
-          <p className="text-gray-500 mb-4">No hay clientes que coincidan con "{buscar}"</p>
+          <p className="text-gray-500 mb-4">No hay clientes que coincidan con &ldquo;{buscar}&rdquo;</p>
           <Link href="/clientes/nuevo">
             <Button variant="outline" size="sm">
               + Registrar cliente nuevo

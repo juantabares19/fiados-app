@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SoloDueño } from '@/components/auth/SoloDueño';
 import { useUsuario } from '@/hooks/useUsuario';
@@ -41,23 +41,27 @@ function UsuariosContent() {
   const [formError, setFormError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
-  const cargarUsuarios = useCallback(async () => {
-    setCargando(true);
-    setError('');
-    try {
-      const res = await fetch('/api/usuarios', { cache: 'no-store' });
-      if (!res.ok) throw new Error();
-      setUsuarios(await res.json());
-    } catch {
-      setError('No se pudieron cargar los usuarios');
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    cargarUsuarios();
-  }, [cargarUsuarios]);
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/usuarios', { cache: 'no-store' });
+        if (!active) return;
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!active) return;
+        setUsuarios(data);
+        setError('');
+      } catch {
+        if (active) setError('No se pudieron cargar los usuarios');
+      } finally {
+        if (active) setCargando(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [refreshKey]);
 
   const cerrarModal = () => {
     setModal(null);
@@ -105,7 +109,7 @@ function UsuariosContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al crear usuario');
       cerrarModal();
-      cargarUsuarios();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error al crear usuario');
       setGuardando(false);
@@ -125,7 +129,7 @@ function UsuariosContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar');
       cerrarModal();
-      cargarUsuarios();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error al guardar');
       setGuardando(false);
@@ -145,7 +149,7 @@ function UsuariosContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al resetear PIN');
       cerrarModal();
-      cargarUsuarios();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error al resetear PIN');
       setGuardando(false);
@@ -163,7 +167,7 @@ function UsuariosContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al cambiar estado');
       cerrarModal();
-      cargarUsuarios();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cambiar estado');
       cerrarModal();
@@ -179,7 +183,7 @@ function UsuariosContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al borrar');
       cerrarModal();
-      cargarUsuarios();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error al borrar');
       setGuardando(false);

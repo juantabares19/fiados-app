@@ -60,9 +60,9 @@ export default function ClientePerfilPage() {
   const [error, setError] = useState('');
   const [mostrarModalBloqueo, setMostrarModalBloqueo] = useState(false);
   const [mostrarModalWhatsApp, setMostrarModalWhatsApp] = useState(false);
-  const [bloqueando, setBloqueando] = useState(false);
+  const [, setBloqueando] = useState(false);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
-  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [cargandoHistorial, setCargandoHistorial] = useState(true);
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [pdfError, setPdfError] = useState('');
   const [generandoPdfDeuda, setGenerandoPdfDeuda] = useState(false);
@@ -81,7 +81,7 @@ export default function ClientePerfilPage() {
         }
         const data = await response.json();
         setCliente(data);
-      } catch (err) {
+      } catch {
         setError('No se pudo cargar el cliente');
       } finally {
         setCargando(false);
@@ -94,22 +94,29 @@ export default function ClientePerfilPage() {
   }, [params.id, router]);
 
   useEffect(() => {
-    if (params.id) {
-      setCargandoHistorial(true);
-      Promise.all([
-        fetch(`/api/fiados?cliente_id=${params.id}`).then(r => r.json()),
-        fetch(`/api/abonos?cliente_id=${params.id}`).then(r => r.json()),
-      ])
-        .then(([fiados, abonos]) => {
-          const fiadosTyped: Fiado[] = (fiados || []).map((f: Fiado) => ({ ...f, tipo: 'fiado' as const }));
-          const abonosTyped: Abono[] = (abonos || []).map((a: Abono) => ({ ...a, tipo: 'abono' as const }));
-          const combinado: Movimiento[] = [...fiadosTyped, ...abonosTyped];
-          combinado.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          setMovimientos(combinado.slice(0, 15));
-        })
-        .catch(() => setMovimientos([]))
-        .finally(() => setCargandoHistorial(false));
-    }
+    if (!params.id) return;
+    let active = true;
+    (async () => {
+      try {
+        const [fiadosRes, abonosRes] = await Promise.all([
+          fetch(`/api/fiados?cliente_id=${params.id}`),
+          fetch(`/api/abonos?cliente_id=${params.id}`),
+        ]);
+        if (!active) return;
+        const [fiados, abonos] = await Promise.all([fiadosRes.json(), abonosRes.json()]);
+        if (!active) return;
+        const fiadosTyped: Fiado[] = (fiados || []).map((f: Fiado) => ({ ...f, tipo: 'fiado' as const }));
+        const abonosTyped: Abono[] = (abonos || []).map((a: Abono) => ({ ...a, tipo: 'abono' as const }));
+        const combinado: Movimiento[] = [...fiadosTyped, ...abonosTyped];
+        combinado.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setMovimientos(combinado.slice(0, 15));
+      } catch {
+        if (active) setMovimientos([]);
+      } finally {
+        if (active) setCargandoHistorial(false);
+      }
+    })();
+    return () => { active = false; };
   }, [params.id]);
 
   const handleBloquear = async () => {
@@ -123,7 +130,7 @@ export default function ClientePerfilPage() {
       const data = await response.json();
       setCliente({ ...cliente, estado: 'bloqueado', saldo: data.saldo });
       setMostrarModalBloqueo(false);
-    } catch (err) {
+    } catch {
       alert('No se pudo bloquear el cliente');
     } finally {
       setBloqueando(false);
@@ -140,7 +147,6 @@ export default function ClientePerfilPage() {
       let pagina = 1;
       const todos: MovimientoPDF[] = [];
       let resumen: ResumenPDF = { total_fiado: 0, total_abonado: 0, saldo: cliente.saldo };
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const res = await fetch(
           `/api/clientes/${cliente.id}/historial?cliente_id=${cliente.id}&limite=${limite}&pagina=${pagina}`,
@@ -177,7 +183,6 @@ export default function ClientePerfilPage() {
       let pagina = 1;
       const todos: MovimientoPDF[] = [];
       let resumen: ResumenPDF = { total_fiado: 0, total_abonado: 0, saldo: cliente.saldo };
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const res = await fetch(
           `/api/clientes/${cliente.id}/historial?cliente_id=${cliente.id}&limite=${limite}&pagina=${pagina}`,
@@ -259,7 +264,7 @@ export default function ClientePerfilPage() {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{cliente.nombre}</h1>
-          {cliente.apodo && <p className="text-gray-500">"{cliente.apodo}"</p>}
+          {cliente.apodo && <p className="text-gray-500">&ldquo;{cliente.apodo}&rdquo;</p>}
         </div>
       </div>
 
@@ -489,7 +494,7 @@ export default function ClientePerfilPage() {
                       <p className="text-xs text-gray-400">Reg: {abono.usuario_nombre}</p>
                     </div>
                     {abono.nota && (
-                      <p className="text-xs text-gray-400 mt-1 italic">"{abono.nota}"</p>
+                      <p className="text-xs text-gray-400 mt-1 italic">&ldquo;{abono.nota}&rdquo;</p>
                     )}
                   </Card>
                 );

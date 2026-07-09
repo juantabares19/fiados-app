@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SoloDueño } from '@/components/auth/SoloDueño';
 import { Card } from '@/components/ui/Card';
@@ -49,7 +49,6 @@ interface ActividadResponse {
   por_tendero: Tendero[];
 }
 
-type VistaType = 'dia' | 'semana';
 type FilterTipo = 'todos' | 'fiados' | 'abonos';
 
 function getNombreDia(date: Date): string {
@@ -64,15 +63,9 @@ function formatDateLocal(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function parseFecha(fechaStr: string): Date {
-  const [year, month, day] = fechaStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
 function ActividadContent() {
   const router = useRouter();
   const [fechaActual, setFechaActual] = useState(new Date());
-  const [vista, setVista] = useState<VistaType>('dia');
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [porTendero, setPorTendero] = useState<Tendero[]>([]);
@@ -86,36 +79,39 @@ function ActividadContent() {
   const nombreDia = getNombreDia(fechaActual);
   const fechaFormateada = fechaActual.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const cargarActividad = useCallback(async (fecha: string) => {
-    setCargando(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/actividad?fecha=${fecha}`);
-      if (!response.ok) throw new Error('Error al cargar actividad');
-      const data: ActividadResponse = await response.json();
-      setResumen(data.resumen);
-      setMovimientos(data.movimientos);
-      setPorTendero(data.por_tendero);
-    } catch (err) {
-      setError('No se pudo cargar la actividad');
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    cargarActividad(fechaStr);
-  }, [fechaStr, cargarActividad]);
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch(`/api/actividad?fecha=${fechaStr}`);
+        if (!active) return;
+        if (!response.ok) throw new Error('Error al cargar actividad');
+        const data: ActividadResponse = await response.json();
+        if (!active) return;
+        setResumen(data.resumen);
+        setMovimientos(data.movimientos);
+        setPorTendero(data.por_tendero);
+        setError('');
+      } catch {
+        if (active) setError('No se pudo cargar la actividad');
+      } finally {
+        if (active) setCargando(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [fechaStr, refreshKey]);
 
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible' && esHoy) {
-        cargarActividad(fechaStr);
+        setRefreshKey(k => k + 1);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [esHoy, fechaStr, cargarActividad]);
+  }, [esHoy]);
 
   const diaAnterior = () => {
     const nueva = new Date(fechaActual);
@@ -209,7 +205,7 @@ function ActividadContent() {
       {error && (
         <Card className="p-4 bg-red-50 border border-red-200">
           <p className="text-red-600 text-center">{error}</p>
-          <Button variant="outline" className="mt-2 w-full" onClick={() => cargarActividad(fechaStr)}>
+          <Button variant="outline" className="mt-2 w-full" onClick={() => { setCargando(true); setError(''); setRefreshKey(k => k + 1); }}>
             Reintentar
           </Button>
         </Card>

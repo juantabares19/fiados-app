@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { formatearMoneda, formatearFecha, formatearFechaCorta, formatearHora } from '@/lib/utils';
+import { formatearMoneda, formatearFecha, formatearHora } from '@/lib/utils';
 import { puedeCancelarFiado } from '@/lib/fiados';
 import type { FiadoRaw } from '@/lib/queries';
 
@@ -19,6 +19,17 @@ export function FiadosList({ initialFiados }: FiadosListProps) {
   const [fiados, setFiados] = useState<FiadoRaw[]>(initialFiados);
   const [fiadoACancelar, setFiadoACancelar] = useState<FiadoRaw | null>(null);
   const [cancelando, setCancelando] = useState(false);
+  const [fechas] = useState(() => {
+    const ahora = new Date();
+    const ayer = new Date(ahora.getTime() - 86400000);
+    const fmt = (d: Date) => d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+    return {
+      hoy: ahora.toISOString().split('T')[0],
+      ayer: ayer.toISOString().split('T')[0],
+      hoyLabel: `Hoy, ${fmt(ahora)}`,
+      ayerLabel: `Ayer, ${fmt(ayer)}`,
+    };
+  });
   const usuarioInteractuo = useRef(false);
   const router = useRouter();
   const { usuario, esDueño } = useUsuario();
@@ -56,15 +67,13 @@ export function FiadosList({ initialFiados }: FiadosListProps) {
 
   const agruparPorDia = (lista: FiadoRaw[]) => {
     const grupos: Record<string, FiadoRaw[]> = {};
-    const hoy = new Date().toISOString().split('T')[0];
-    const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
     lista.forEach((fiado) => {
       const fecha = fiado.created_at.split('T')[0];
-      let label: string;
-      if (fecha === hoy) label = `Hoy, ${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}`;
-      else if (fecha === ayer) label = `Ayer, ${new Date(Date.now() - 86400000).toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}`;
-      else label = formatearFecha(fecha);
+      const label =
+        fecha === fechas.hoy ? fechas.hoyLabel
+        : fecha === fechas.ayer ? fechas.ayerLabel
+        : formatearFecha(fecha);
       if (!grupos[label]) grupos[label] = [];
       grupos[label].push(fiado);
     });

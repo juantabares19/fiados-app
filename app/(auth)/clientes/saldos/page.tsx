@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { formatearMoneda } from '@/lib/utils';
@@ -30,26 +30,27 @@ export default function SaldosPage() {
   const [error, setError] = useState('');
   const [orden, setOrden] = useState<OrdenType>('deuda');
 
-  const cargarSaldos = useCallback(async (ord: OrdenType) => {
-    setCargando(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/clientes/saldos?orden=${ord}`);
-      if (!response.ok) throw new Error('Error al cargar saldos');
-      const data: SaldosResponse = await response.json();
-      setClientes(data.clientes);
-      setCarteraTotal(data.cartera_total);
-      setClientesConDeuda(data.clientes_con_deuda);
-    } catch (err) {
-      setError('No se pudo cargar la información');
-    } finally {
-      setCargando(false);
-    }
-  }, []);
-
   useEffect(() => {
-    cargarSaldos(orden);
-  }, [orden, cargarSaldos]);
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch(`/api/clientes/saldos?orden=${orden}`);
+        if (!active) return;
+        if (!response.ok) throw new Error('Error al cargar saldos');
+        const data: SaldosResponse = await response.json();
+        if (!active) return;
+        setClientes(data.clientes);
+        setCarteraTotal(data.cartera_total);
+        setClientesConDeuda(data.clientes_con_deuda);
+        setError('');
+      } catch {
+        if (active) setError('No se pudo cargar la información');
+      } finally {
+        if (active) setCargando(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [orden]);
 
   const getBadgeColor = (saldo: number): string => {
     if (saldo === 0) return 'bg-green-100 text-green-700';

@@ -1,12 +1,11 @@
 // TODO: Migrar a Server Component + Client Component separado (depende de useConfig y SoloDueño que requieren contexto cliente)
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SoloDueño } from '@/components/auth/SoloDueño';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatearMoneda, formatearFechaCorta, calcularEstadoMora } from '@/lib/utils';
 import { generarMensajeRecordatorio, BotonWhatsApp } from '@/lib/whatsapp';
@@ -49,26 +48,28 @@ function MorososContent() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState<FilterTipo>('todos');
-
-  const cargarMorosos = useCallback(async () => {
-    setCargando(true);
-    setError('');
-    try {
-      const response = await fetch('/api/morosos');
-      if (!response.ok) throw new Error('Error al cargar morosos');
-      const data: MorososResponse = await response.json();
-      setClientes(data.clientes);
-      setResumen(data.resumen);
-    } catch (err) {
-      setError('No se pudo cargar la información de morosos');
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    cargarMorosos();
-  }, [cargarMorosos]);
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch('/api/morosos');
+        if (!active) return;
+        if (!response.ok) throw new Error('Error al cargar morosos');
+        const data: MorososResponse = await response.json();
+        if (!active) return;
+        setClientes(data.clientes);
+        setResumen(data.resumen);
+        setError('');
+      } catch {
+        if (active) setError('No se pudo cargar la información de morosos');
+      } finally {
+        if (active) setCargando(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [refreshKey]);
 
   const clientesFiltrados = clientes.filter(c => {
     if (filtro === 'morosos' && c.estado_mora !== 'moroso') return false;
@@ -123,7 +124,7 @@ function MorososContent() {
       {error && (
         <Card className="p-4 bg-red-50 border border-red-200">
           <p className="text-red-600 text-center">{error}</p>
-          <Button variant="outline" className="mt-2 w-full" onClick={cargarMorosos}>
+          <Button variant="outline" className="mt-2 w-full" onClick={() => { setCargando(true); setError(''); setRefreshKey(k => k + 1); }}>
             Reintentar
           </Button>
         </Card>

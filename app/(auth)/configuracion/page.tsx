@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { SoloDueño } from '@/components/auth/SoloDueño';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { formatearMoneda } from '@/lib/utils';
 
 interface Configuracion {
   nombre_tienda: string;
@@ -14,7 +13,7 @@ interface Configuracion {
 
 function ConfiguracionContent() {
   const router = useRouter();
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const [, setConfig] = useState<Record<string, string>>({});
   const [nombreTienda, setNombreTienda] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState('');
@@ -50,7 +49,7 @@ function ConfiguracionContent() {
       } else {
         setMensaje('Error al guardar');
       }
-    } catch (err) {
+    } catch {
       setMensaje('Error al guardar');
     } finally {
       setGuardando(false);

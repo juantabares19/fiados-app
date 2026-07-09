@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ClienteConSaldo } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { useUsuario } from '@/hooks/useUsuario';
 import { SelectorCliente } from '@/components/clientes/SelectorCliente';
 import { formatearMoneda } from '@/lib/utils';
 import { generarMensajeConfirmacionAbono, abrirWhatsApp } from '@/lib/whatsapp';
@@ -24,7 +23,6 @@ interface AbonoCreado {
 function NuevoAbonoContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { usuario } = useUsuario();
   const { config } = useConfig();
   const nombreTienda = config?.nombre_tienda ?? 'Mi Tienda';
 
@@ -45,28 +43,28 @@ function NuevoAbonoContent() {
 
   useEffect(() => {
     const clienteId = searchParams.get('cliente');
-    if (clienteId) {
-      setClientePreseleccionadoId(clienteId);
-      cargarCliente(clienteId);
-    }
-  }, [searchParams]);
-
-  const cargarCliente = async (id: string) => {
-    try {
-      const response = await fetch(`/api/clientes/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setClienteSeleccionado(data);
-        setPaso(2);
-      } else {
-        // No se pudo cargar: caer al buscador en vez de quedar en pantalla de carga.
-        setClientePreseleccionadoId(null);
+    if (!clienteId) return;
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch(`/api/clientes/${clienteId}`);
+        if (!active) return;
+        if (response.ok) {
+          const data = await response.json();
+          if (!active) return;
+          setClienteSeleccionado(data);
+          setPaso(2);
+        } else {
+          // No se pudo cargar: caer al buscador en vez de quedar en pantalla de carga.
+          setClientePreseleccionadoId(null);
+        }
+      } catch (err) {
+        console.error('Error al cargar cliente:', err);
+        if (active) setClientePreseleccionadoId(null);
       }
-    } catch (err) {
-      console.error('Error al cargar cliente:', err);
-      setClientePreseleccionadoId(null);
-    }
-  };
+    })();
+    return () => { active = false; };
+  }, [searchParams]);
 
   const seleccionarCliente = (cliente: ClienteConSaldo) => {
     if (cliente.saldo <= 0) {

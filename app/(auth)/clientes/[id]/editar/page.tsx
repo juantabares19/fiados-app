@@ -42,7 +42,7 @@ export default function EditarClientePage() {
         setTopeCredito(data.tope_credito?.toString() || '50000');
         setFamiliares(data.familiares || '');
         setEstado(data.estado || 'activo');
-      } catch (err) {
+      } catch {
         setError('No se pudo cargar el cliente');
       } finally {
         setCargando(false);

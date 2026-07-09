@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useUsuario } from '@/hooks/useUsuario';
-import { formatearMoneda, formatearFechaCorta, formatearFecha, formatearHora } from '@/lib/utils';
+import { formatearMoneda, formatearFecha, formatearHora } from '@/lib/utils';
 
 interface Abono {
   id: string;
@@ -39,28 +39,42 @@ export default function AbonosPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [abonoAEliminar, setAbonoAEliminar] = useState<Abono | null>(null);
-  const [eliminando, setEliminando] = useState(false);
+  const [, setEliminando] = useState(false);
+  const [fechas] = useState(() => {
+    const ahora = new Date();
+    const ayer = new Date(ahora.getTime() - 86400000);
+    const fmt = (d: Date) => d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+    return {
+      hoy: ahora.toISOString().split('T')[0],
+      ayer: ayer.toISOString().split('T')[0],
+      hoyLabel: `Hoy, ${fmt(ahora)}`,
+      ayerLabel: `Ayer, ${fmt(ayer)}`,
+    };
+  });
   const { esDueño } = useUsuario();
   const router = useRouter();
 
-  const cargarAbonos = useCallback(async () => {
-    setCargando(true);
-    setError('');
-    try {
-      const response = await fetch('/api/abonos');
-      if (!response.ok) throw new Error('Error al obtener abonos');
-      const data = await response.json();
-      setAbonos(data);
-    } catch (err) {
-      setError('No se pudieron cargar los abonos');
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    cargarAbonos();
-  }, [cargarAbonos]);
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch('/api/abonos');
+        if (!active) return;
+        if (!response.ok) throw new Error('Error al obtener abonos');
+        const data = await response.json();
+        if (!active) return;
+        setAbonos(data);
+        setError('');
+      } catch {
+        if (active) setError('No se pudieron cargar los abonos');
+      } finally {
+        if (active) setCargando(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [refreshKey]);
 
   const handleEliminar = async () => {
     if (!abonoAEliminar) return;
@@ -74,7 +88,7 @@ export default function AbonosPage() {
         throw new Error(data.error || 'Error al eliminar');
       }
       setAbonoAEliminar(null);
-      cargarAbonos();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error al eliminar abono');
     } finally {
@@ -84,16 +98,13 @@ export default function AbonosPage() {
 
   const agruparPorDia = (abonos: Abono[]): AbonosAgrupados => {
     const grupos: AbonosAgrupados = {};
-    const hoy = new Date().toISOString().split('T')[0];
-    const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
     abonos.forEach((abono) => {
       const fecha = abono.created_at.split('T')[0];
-      let label = formatearFechaCorta(fecha);
-
-      if (fecha === hoy) label = `Hoy, ${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}`;
-      else if (fecha === ayer) label = `Ayer, ${new Date(Date.now() - 86400000).toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}`;
-      else label = formatearFecha(fecha);
+      const label =
+        fecha === fechas.hoy ? fechas.hoyLabel
+        : fecha === fechas.ayer ? fechas.ayerLabel
+        : formatearFecha(fecha);
 
       if (!grupos[label]) grupos[label] = [];
       grupos[label].push(abono);
@@ -129,7 +140,7 @@ export default function AbonosPage() {
       {error && (
         <Card className="p-4 bg-red-50 border border-red-200">
           <p className="text-red-600 text-center">{error}</p>
-          <Button variant="outline" className="mt-2 w-full" onClick={cargarAbonos}>
+          <Button variant="outline" className="mt-2 w-full" onClick={() => { setCargando(true); setError(''); setRefreshKey(k => k + 1); }}>
             Reintentar
           </Button>
         </Card>

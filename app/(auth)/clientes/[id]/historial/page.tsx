@@ -68,10 +68,6 @@ export default function HistorialPage() {
     page: number = 1,
     append: boolean = false
   ) => {
-    if (page === 1) setCargando(true);
-    else setCargandoMas(true);
-    setError('');
-
     try {
       const params = new URLSearchParams();
       params.set('cliente_id', clienteId);
@@ -94,7 +90,8 @@ export default function HistorialPage() {
       setResumen(data.resumen);
       setTotalPaginas(data.total_paginas);
       setPagina(page);
-    } catch (err) {
+      setError('');
+    } catch {
       setError('No se pudo cargar el historial');
     } finally {
       setCargando(false);
@@ -103,16 +100,45 @@ export default function HistorialPage() {
   }, [clienteId]);
 
   useEffect(() => {
-    cargarHistorial(filtroTipo, fechaDesde || undefined, fechaHasta || undefined);
-  }, [filtroTipo, fechaDesde, fechaHasta, cargarHistorial]);
+    let active = true;
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set('cliente_id', clienteId);
+        params.set('limite', '15');
+        params.set('pagina', '1');
+        if (filtroTipo !== 'todos') params.set('tipo', filtroTipo);
+        if (fechaDesde) params.set('desde', fechaDesde);
+        if (fechaHasta) params.set('hasta', fechaHasta);
+
+        const response = await fetch(`/api/clientes/${clienteId}/historial?${params.toString()}`);
+        if (!active) return;
+        if (!response.ok) throw new Error('Error al cargar historial');
+        const data: HistorialResponse = await response.json();
+        if (!active) return;
+        setMovimientos(data.movimientos);
+        setResumen(data.resumen);
+        setTotalPaginas(data.total_paginas);
+        setPagina(1);
+        setError('');
+      } catch {
+        if (active) setError('No se pudo cargar el historial');
+      } finally {
+        if (active) setCargando(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [filtroTipo, fechaDesde, fechaHasta, clienteId]);
 
   const aplicarFiltro = () => {
     setPagina(1);
+    setCargando(true);
     cargarHistorial(filtroTipo, fechaDesde || undefined, fechaHasta || undefined, 1, false);
   };
 
   const cargarMas = () => {
     if (pagina < totalPaginas) {
+      setCargandoMas(true);
       cargarHistorial(filtroTipo, fechaDesde || undefined, fechaHasta || undefined, pagina + 1, true);
     }
   };
@@ -321,7 +347,7 @@ export default function HistorialPage() {
                           <p className="text-xs text-gray-400">Reg: {mov.usuario_nombre}</p>
                         </div>
                         {mov.nota && (
-                          <p className="text-xs text-gray-400 mt-1 italic">"{mov.nota}"</p>
+                          <p className="text-xs text-gray-400 mt-1 italic">&ldquo;{mov.nota}&rdquo;</p>
                         )}
                       </Card>
                     );

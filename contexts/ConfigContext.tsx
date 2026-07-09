@@ -23,12 +23,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const fetchConfig = async () => {
     try {
-      setLoading(true);
-      setError(null);
       const res = await fetch('/api/configuracion');
       if (!res.ok) throw new Error('Error al cargar configuración');
       const data = await res.json();
       setConfig(data);
+      setError(null);
     } catch (err) {
       console.error('Error al cargar configuración:', err);
       setError('No se pudo cargar la configuración');
@@ -38,7 +37,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchConfig();
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/configuracion');
+        if (!active) return;
+        if (!res.ok) throw new Error('Error al cargar configuración');
+        const data = await res.json();
+        if (!active) return;
+        setConfig(data);
+        setError(null);
+      } catch (err) {
+        console.error('Error al cargar configuración:', err);
+        if (active) setError('No se pudo cargar la configuración');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
   }, []);
 
   return (
