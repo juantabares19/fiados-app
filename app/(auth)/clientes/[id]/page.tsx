@@ -273,6 +273,12 @@ export default function ClientePerfilPage() {
         <div className="text-gray-600">
           <span className="font-medium">Tope:</span> {formatearMoneda(cliente.tope_credito)}
         </div>
+        <div className="text-gray-600">
+          <span className="font-medium">Disponible:</span>{' '}
+          <span className={cliente.tope_credito - cliente.saldo > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+            {formatearMoneda(cliente.tope_credito - cliente.saldo)}
+          </span>
+        </div>
         {cliente.familiares && (
           <div className="text-gray-600">
             <span className="font-medium">Familiares:</span> {cliente.familiares}

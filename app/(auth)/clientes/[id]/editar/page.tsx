@@ -6,6 +6,7 @@ import { ClienteConSaldo } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useUsuario } from '@/hooks/useUsuario';
+import { formatearMoneda } from '@/lib/utils';
 
 export default function EditarClientePage() {
   const params = useParams();
@@ -96,6 +97,9 @@ export default function EditarClientePage() {
       setGuardando(false);
     }
   };
+
+  const saldoActual = cliente?.saldo || 0;
+  const disponibleConNuevoTope = (parseFloat(topeCredito) || 0) - saldoActual;
 
   const handleTopeBlur = () => {
     const valor = parseFloat(topeCredito.replace(/\D/g, ''));
@@ -206,6 +210,12 @@ export default function EditarClientePage() {
                 disabled={guardando}
               />
             </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Debe actualmente: {formatearMoneda(saldoActual)}
+            </p>
+            <p className={`text-sm mt-1 font-medium ${disponibleConNuevoTope > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              Disponible con este tope: {formatearMoneda(disponibleConNuevoTope)}
+            </p>
           </div>
 
           <div>
