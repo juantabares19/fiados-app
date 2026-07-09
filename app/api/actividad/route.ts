@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       tipo: 'fiado' | 'abono';
       id: string;
       hora: string;
+      created_at: string;
       cliente_nombre: string;
       cliente_id: string;
       descripcion?: string;
@@ -106,6 +107,7 @@ export async function GET(request: Request) {
           tipo: 'fiado',
           id: f.id,
           hora,
+          created_at: f.created_at,
           cliente_nombre: clienteNombre,
           cliente_id: f.cliente_id,
           descripcion,
@@ -156,6 +158,7 @@ export async function GET(request: Request) {
           tipo: 'abono',
           id: a.id,
           hora,
+          created_at: a.created_at,
           cliente_nombre: clienteNombre,
           cliente_id: a.cliente_id,
           monto: a.monto,
@@ -174,10 +177,11 @@ export async function GET(request: Request) {
       });
     }
 
+    // Ordenar por el instant absoluto (created_at ISO), no por la hora formateada.
+    // Antes se usaba `new Date(`${fechaActual}T${hora}`)` donde hora era un string
+    // tipo "03:45 p. m." (locale es-CO) -> Invalid Date -> sort con NaN -> orden arbitrario.
     movimientos.sort((a, b) => {
-      const dateA = new Date(`${fechaActual}T${a.hora}`);
-      const dateB = new Date(`${fechaActual}T${b.hora}`);
-      return dateB.getTime() - dateA.getTime();
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
     const resumen = {

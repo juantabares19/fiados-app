@@ -1,21 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth-guard';
+import { puedeCancelarFiado } from '@/lib/fiados';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
-
-function puedeCancelarFiado(
-  fiado: { created_at: string; usuario_id: string },
-  usuarioId: string,
-  esDueño: boolean
-): boolean {
-  if (esDueño) return true;
-
-  const cincoMinutos = 5 * 60 * 1000;
-  const hace5Min = new Date(Date.now() - cincoMinutos);
-  const creado = new Date(fiado.created_at);
-
-  return creado > hace5Min && fiado.usuario_id === usuarioId;
-}
 
 export async function GET(
   request: Request,

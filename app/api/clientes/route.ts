@@ -129,6 +129,15 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
+      // 23505 = violación de UNIQUE. La rama de verificación previa arriba (L102-113)
+      // no es atómica con el INSERT; dos requests concurrentes con el mismo celular
+      // pueden pasarla y solo la BD atrapa al segundo. Mismo patrón que /api/usuarios.
+      if (error.code === '23505') {
+        return NextResponse.json(
+          { error: 'Ya existe un cliente con este número' },
+          { status: 409 }
+        );
+      }
       console.error('Error creating cliente:', error);
       return NextResponse.json({ error: 'Error al crear cliente' }, { status: 500 });
     }

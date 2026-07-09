@@ -19,11 +19,14 @@ async function main() {
   console.log('\n=== Crear Usuario - Fiados App ===\n');
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Usamos service_role porque las políticas RLS deny-all (ver
+  // 20260618120002_rls_deny_all_public_roles.sql) revocaron todos los grants de
+  // anon/authenticated, incluyendo INSERT sobre usuarios. El anon key ya no sirve.
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Error: Variables de entorno no configuradas.');
-    console.error('Verifica que NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY estén en .env.local');
+    console.error('Verifica que NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY estén en .env.local');
     process.exit(1);
   }
 

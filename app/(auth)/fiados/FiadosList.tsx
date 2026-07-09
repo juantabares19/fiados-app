@@ -8,17 +8,11 @@ import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatearMoneda, formatearFecha, formatearFechaCorta, formatearHora } from '@/lib/utils';
+import { puedeCancelarFiado } from '@/lib/fiados';
 import type { FiadoRaw } from '@/lib/queries';
 
 interface FiadosListProps {
   initialFiados: FiadoRaw[];
-}
-
-function puedeCancelarFiado(fiado: FiadoRaw, usuarioId: string, esDueño: boolean): boolean {
-  if (esDueño) return true;
-  const cincoMinutos = 5 * 60 * 1000;
-  const hace5Min = new Date(Date.now() - cincoMinutos);
-  return new Date(fiado.created_at) > hace5Min && fiado.usuario_id === usuarioId;
 }
 
 export function FiadosList({ initialFiados }: FiadosListProps) {

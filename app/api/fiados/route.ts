@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/auth-guard';
 import { esEnteroPositivo, CANTIDAD_MAX, parseEntero } from '@/lib/validation';
 import { inicioDia, finDia } from '@/lib/fechas';
 import { QUERY_LIMIT_DEFAULT } from '@/lib/constants';
+import { puedeCancelarFiado } from '@/lib/fiados';
 import type { ClienteRelacion, UsuarioRelacion } from '@/lib/database.types';
 
 export async function GET(request: Request) {
@@ -106,20 +107,6 @@ export async function GET(request: Request) {
     console.error('GET /api/fiados error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
-}
-
-function puedeCancelarFiado(
-  fiado: { created_at: string; usuario_id: string },
-  usuarioId: string,
-  esDueño: boolean
-): boolean {
-  if (esDueño) return true;
-
-  const cincoMinutos = 5 * 60 * 1000;
-  const hace5Min = new Date(Date.now() - cincoMinutos);
-  const creado = new Date(fiado.created_at);
-
-  return creado > hace5Min && fiado.usuario_id === usuarioId;
 }
 
 export async function POST(request: Request) {
